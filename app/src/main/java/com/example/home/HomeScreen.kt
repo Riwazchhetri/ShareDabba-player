@@ -61,6 +61,7 @@ import com.example.R
 import com.example.core.error.UiState
 import com.example.data.fixtures.DevFixturesCatalog
 import com.example.domain.model.StreamBookmark
+import com.example.remoteconfig.PublishedRemoteConfig
 import com.example.ui.common.DevFixtureNoticeBanner
 import com.example.ui.common.PreviewStateMode
 import com.example.ui.common.ShareDabbaEmptyState
@@ -79,6 +80,7 @@ import com.example.ui.theme.ShareDabbaOutline
 import com.example.ui.theme.ShareDabbaPurple
 import com.example.ui.theme.ShareDabbaSurface
 import com.example.ui.theme.ShareDabbaTextSecondary
+import com.example.ui.theme.ShareDabbaWarning
 import com.example.ui.theme.ShareDabbaWhite
 
 /**
@@ -91,10 +93,12 @@ import com.example.ui.theme.ShareDabbaWhite
  * - Search shortcut
  * - Clear navigation to User Dashboard, Notifications, Recently Watched, Video Details, and Player
  * - Real Cloud Stream Bookmarks (Firestore + Room cache)
+ * - Stage 8 Remote Admin Control integration (Branding, Announcements, Section/Banner visibility)
  */
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
+    remoteConfig: PublishedRemoteConfig = PublishedRemoteConfig.SAFE_DEFAULT,
     onNavigate: (String) -> Unit,
     onOpenVideoDetails: (String) -> Unit,
     onPlayStream: (String) -> Unit
@@ -132,8 +136,8 @@ fun HomeScreen(
     ) {
         item {
             ShareDabbaTopBar(
-                title = "ShareDabba",
-                subtitle = "STREAMING PLATFORM • STAGE 3 UI",
+                title = remoteConfig.branding.appDisplayName,
+                subtitle = "STREAMING PLATFORM • CONFIG v${remoteConfig.configVersion}",
                 actions = {
                     IconButton(
                         onClick = { onNavigate(ShareDabbaDestination.RecentlyWatched.route) },
@@ -145,15 +149,17 @@ fun HomeScreen(
                             tint = ShareDabbaCyan
                         )
                     }
-                    IconButton(
-                        onClick = { onNavigate(ShareDabbaDestination.UserDashboard.route) },
-                        modifier = Modifier.testTag("home_action_dashboard")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Dashboard,
-                            contentDescription = "User Dashboard",
-                            tint = ShareDabbaWhite
-                        )
+                    if (remoteConfig.appManagement.enableCreatorDashboard) {
+                        IconButton(
+                            onClick = { onNavigate(ShareDabbaDestination.UserDashboard.route) },
+                            modifier = Modifier.testTag("home_action_dashboard")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Dashboard,
+                                contentDescription = "User Dashboard",
+                                tint = ShareDabbaWhite
+                            )
+                        }
                     }
                     IconButton(
                         onClick = { onNavigate(ShareDabbaDestination.Notifications.route) },
@@ -167,6 +173,51 @@ fun HomeScreen(
                     }
                 }
             )
+        }
+
+        // Stage 8 Remote Admin Announcement / Maintenance Banner
+        if (remoteConfig.appManagement.maintenanceModeEnabled ||
+            remoteConfig.branding.globalAnnouncementBanner.isNotBlank() ||
+            remoteConfig.appManagement.updateAnnouncementText.isNotBlank()
+        ) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .border(1.dp, ShareDabbaWarning, RoundedCornerShape(14.dp))
+                        .testTag("home_remote_admin_banner"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = ShareDabbaSurface)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (remoteConfig.appManagement.maintenanceModeEnabled) {
+                            Text(
+                                text = "MAINTENANCE MODE ACTIVE: ${remoteConfig.appManagement.maintenanceMessage}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = ShareDabbaError
+                            )
+                        }
+                        if (remoteConfig.branding.globalAnnouncementBanner.isNotBlank()) {
+                            Text(
+                                text = remoteConfig.branding.globalAnnouncementBanner,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ShareDabbaCyan
+                            )
+                        }
+                        if (remoteConfig.appManagement.updateAnnouncementText.isNotBlank()) {
+                            Text(
+                                text = remoteConfig.appManagement.updateAnnouncementText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ShareDabbaWarning
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // Search Bar Shortcut & Quick Navigation Pills
@@ -251,72 +302,74 @@ fun HomeScreen(
             }
 
             PreviewStateMode.DATA -> {
-                // Hero Banner
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .height(176.dp)
-                            .clip(RoundedCornerShape(22.dp))
-                            .border(1.5.dp, ShareDabbaAccentGradient, RoundedCornerShape(22.dp))
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.bg_hero_streaming),
-                            contentDescription = "ShareDabba Streaming Hero Banner",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Column(
+                // Hero Banner (Admin Controlled: homeScreen.showHeroBanner)
+                if (remoteConfig.homeScreen.showHeroBanner) {
+                    item {
+                        Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(20.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .height(176.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .border(1.5.dp, ShareDabbaAccentGradient, RoundedCornerShape(22.dp))
                         ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Image(
+                                painter = painterResource(id = R.drawable.bg_hero_streaming),
+                                contentDescription = "ShareDabba Streaming Hero Banner",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
                             ) {
-                                ShareDabbaGradientBadge(text = "SHARE DABBA LIVE")
-                                ShareDabbaGradientBadge(text = "4K ADAPTIVE")
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = "Stream, Upload & Track Creator Revenue",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = ShareDabbaWhite
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(
-                                        onClick = {
-                                            val firstFeatured = featuredVideos.firstOrNull()
-                                            if (firstFeatured != null) {
-                                                onOpenVideoDetails(firstFeatured.id)
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = ShareDabbaCyan,
-                                            contentColor = ShareDabbaBlack
-                                        ),
-                                        modifier = Modifier.testTag("hero_watch_featured_button")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.padding(3.dp))
-                                        Text("Featured Stream")
-                                    }
-                                    Button(
-                                        onClick = { onNavigate(ShareDabbaDestination.UserDashboard.route) },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = ShareDabbaPurple,
-                                            contentColor = ShareDabbaWhite
-                                        ),
-                                        modifier = Modifier.testTag("hero_dashboard_button")
-                                    ) {
-                                        Text("Creator Dashboard")
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    ShareDabbaGradientBadge(text = "SHARE DABBA LIVE")
+                                    ShareDabbaGradientBadge(text = "4K ADAPTIVE")
+                                }
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = "Stream, Upload & Track Creator Revenue",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = ShareDabbaWhite
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = {
+                                                val firstFeatured = featuredVideos.firstOrNull()
+                                                if (firstFeatured != null) {
+                                                    onOpenVideoDetails(firstFeatured.id)
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = ShareDabbaCyan,
+                                                contentColor = ShareDabbaBlack
+                                            ),
+                                            modifier = Modifier.testTag("hero_watch_featured_button")
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.padding(3.dp))
+                                            Text("Featured Stream")
+                                        }
+                                        Button(
+                                            onClick = { onNavigate(ShareDabbaDestination.UserDashboard.route) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = ShareDabbaPurple,
+                                                contentColor = ShareDabbaWhite
+                                            ),
+                                            modifier = Modifier.testTag("hero_dashboard_button")
+                                        ) {
+                                            Text("Creator Dashboard")
+                                        }
                                     }
                                 }
                             }
@@ -324,122 +377,130 @@ fun HomeScreen(
                     }
                 }
 
-                // Categories Bar
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                // Categories Bar (Admin Controlled: homeScreen.showCategoriesBar)
+                if (remoteConfig.homeScreen.showCategoriesBar) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Category,
+                                        contentDescription = null,
+                                        tint = ShareDabbaCyan
+                                    )
+                                    Text(
+                                        text = "Categories",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = ShareDabbaWhite
+                                    )
+                                }
+                                TextButton(
+                                    onClick = { onNavigate(ShareDabbaDestination.Categories.route) },
+                                    modifier = Modifier.testTag("home_see_all_categories_button")
+                                ) {
+                                    Text("Browse All", color = ShareDabbaCyan)
+                                }
+                            }
+
+                            val categoryNames = listOf("All") + DevFixturesCatalog.categories.map { it.name }
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Category,
-                                    contentDescription = null,
-                                    tint = ShareDabbaCyan
-                                )
-                                Text(
-                                    text = "Categories",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = ShareDabbaWhite
-                                )
-                            }
-                            TextButton(
-                                onClick = { onNavigate(ShareDabbaDestination.Categories.route) },
-                                modifier = Modifier.testTag("home_see_all_categories_button")
-                            ) {
-                                Text("Browse All", color = ShareDabbaCyan)
-                            }
-                        }
-
-                        val categoryNames = listOf("All") + DevFixturesCatalog.categories.map { it.name }
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(categoryNames) { category ->
-                                FilterChip(
-                                    selected = selectedCategoryName == category,
-                                    onClick = { selectedCategoryName = category },
-                                    label = { Text(category) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = ShareDabbaCyan,
-                                        selectedLabelColor = ShareDabbaBlack,
-                                        containerColor = ShareDabbaSurface,
-                                        labelColor = ShareDabbaWhite
-                                    ),
-                                    modifier = Modifier.testTag("home_category_chip_$category")
-                                )
+                                items(categoryNames) { category ->
+                                    FilterChip(
+                                        selected = selectedCategoryName == category,
+                                        onClick = { selectedCategoryName = category },
+                                        label = { Text(category) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = ShareDabbaCyan,
+                                            selectedLabelColor = ShareDabbaBlack,
+                                            containerColor = ShareDabbaSurface,
+                                            labelColor = ShareDabbaWhite
+                                        ),
+                                        modifier = Modifier.testTag("home_category_chip_$category")
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // Section 1: Featured Videos
-                item {
-                    SectionHeaderRow(
-                        title = "Featured Videos",
-                        badge = "${featuredVideos.size} Featured",
-                        icon = Icons.Default.Star
-                    )
-                }
-
-                items(featuredVideos, key = { "featured_${it.id}" }) { video ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        ShareDabbaVideoCard(
-                            video = video,
-                            onCardClick = { onOpenVideoDetails(video.id) },
-                            onWatchClick = { onPlayStream(video.streamUrl) },
-                            testTag = "home_featured_${video.id}"
+                // Section 1: Featured Videos (Admin Controlled: homeScreen.showFeaturedVideosSection)
+                if (remoteConfig.homeScreen.showFeaturedVideosSection) {
+                    item {
+                        SectionHeaderRow(
+                            title = "Featured Videos",
+                            badge = "${featuredVideos.size} Featured",
+                            icon = Icons.Default.Star
                         )
+                    }
+
+                    items(featuredVideos, key = { "featured_${it.id}" }) { video ->
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            ShareDabbaVideoCard(
+                                video = video,
+                                onCardClick = { onOpenVideoDetails(video.id) },
+                                onWatchClick = { onPlayStream(video.streamUrl) },
+                                testTag = "home_featured_${video.id}"
+                            )
+                        }
                     }
                 }
 
-                // Section 2: Recently Uploaded Videos
-                item {
-                    SectionHeaderRow(
-                        title = "Recently Uploaded Videos",
-                        badge = "Latest Drops",
-                        icon = Icons.Default.Update
-                    )
-                }
-
-                items(recentVideos, key = { "recent_${it.id}" }) { video ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        ShareDabbaVideoCard(
-                            video = video,
-                            onCardClick = { onOpenVideoDetails(video.id) },
-                            onWatchClick = { onPlayStream(video.streamUrl) },
-                            testTag = "home_recent_${video.id}"
+                // Section 2: Recently Uploaded Videos (Admin Controlled: homeScreen.showRecentlyUploadedSection)
+                if (remoteConfig.homeScreen.showRecentlyUploadedSection) {
+                    item {
+                        SectionHeaderRow(
+                            title = "Recently Uploaded Videos",
+                            badge = "Latest Drops",
+                            icon = Icons.Default.Update
                         )
+                    }
+
+                    items(recentVideos, key = { "recent_${it.id}" }) { video ->
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            ShareDabbaVideoCard(
+                                video = video,
+                                onCardClick = { onOpenVideoDetails(video.id) },
+                                onWatchClick = { onPlayStream(video.streamUrl) },
+                                testTag = "home_recent_${video.id}"
+                            )
+                        }
                     }
                 }
 
-                // Section 3: Popular Videos
-                item {
-                    SectionHeaderRow(
-                        title = "Popular Videos",
-                        badge = "Trending Now",
-                        icon = Icons.Default.TrendingUp
-                    )
-                }
-
-                items(popularVideos, key = { "popular_${it.id}" }) { video ->
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        ShareDabbaVideoCard(
-                            video = video,
-                            onCardClick = { onOpenVideoDetails(video.id) },
-                            onWatchClick = { onPlayStream(video.streamUrl) },
-                            testTag = "home_popular_${video.id}"
+                // Section 3: Popular Videos (Admin Controlled: homeScreen.showPopularVideosSection)
+                if (remoteConfig.homeScreen.showPopularVideosSection) {
+                    item {
+                        SectionHeaderRow(
+                            title = "Popular Videos",
+                            badge = "Trending Now",
+                            icon = Icons.Default.TrendingUp
                         )
+                    }
+
+                    items(popularVideos, key = { "popular_${it.id}" }) { video ->
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            ShareDabbaVideoCard(
+                                video = video,
+                                onCardClick = { onOpenVideoDetails(video.id) },
+                                onWatchClick = { onPlayStream(video.streamUrl) },
+                                testTag = "home_popular_${video.id}"
+                            )
+                        }
                     }
                 }
             }

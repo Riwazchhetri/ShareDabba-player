@@ -30,10 +30,13 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,10 +44,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
+import com.example.advertisements.MonetizationCoordinator
+import com.example.advertisements.WithdrawalSubmissionRecord
 import com.example.core.config.EnvironmentConfig
 import com.example.data.fixtures.DevFixturesCatalog
 import com.example.data.fixtures.WithdrawalRecordFixture
+import com.example.remoteconfig.RemoteConfigManager
 import com.example.ui.common.DevFixtureNoticeBanner
 import com.example.ui.common.PreviewStateMode
 import com.example.ui.common.ShareDabbaEmptyState
@@ -64,12 +71,14 @@ import com.example.ui.theme.ShareDabbaWhite
 
 /**
  * Screen 14: Wallet Screen
- * Displays unified website wallet overview using clearly labelled development fixtures
- * and navigates to Withdrawal History & Creator Earnings.
+ * Displays unified website wallet overview (Pending Earnings, Confirmed Earnings, Available Balance),
+ * missing backend payout integration report, and authenticated duplicate-safe withdrawal request submission.
  */
 @Composable
 fun WalletScreen(
     environmentConfig: EnvironmentConfig,
+    monetizationCoordinator: MonetizationCoordinator? = null,
+    authenticatedUserId: String? = "usr-aarav-mehta",
     onOpenWithdrawalHistory: () -> Unit = {},
     onOpenEarnings: () -> Unit = {},
     onBackClick: () -> Unit
@@ -77,7 +86,17 @@ fun WalletScreen(
     BackHandler(onBack = onBackClick)
 
     var stateMode by rememberSaveable { mutableStateOf(PreviewStateMode.DATA) }
-    val metrics = DevFixturesCatalog.dashboardMetrics
+    val coordinator = remember(monetizationCoordinator, environmentConfig) {
+        monetizationCoordinator ?: MonetizationCoordinator(
+            environmentConfig = environmentConfig,
+            remoteConfigManager = RemoteConfigManager(environmentConfig)
+        )
+    }
+    val ledger by coordinator.ledgerSnapshot.collectAsStateWithLifecycle()
+
+    var amountInput by rememberSaveable { mutableStateOf("45.00") }
+    var destinationInput by rememberSaveable { mutableStateOf("UPI • aarav.creator@okaxis") }
+    var idempotencySequence by rememberSaveable { mutableIntStateOf(1) }
 
     Column(
         modifier = Modifier
@@ -126,6 +145,7 @@ fun WalletScreen(
                 }
 
                 PreviewStateMode.DATA -> {
+                    // Balances Overview Card (Pending, Confirmed, Available)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -135,7 +155,7 @@ fun WalletScreen(
                     ) {
                         Column(
                             modifier = Modifier.padding(18.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             ShareDabbaGradientBadge(text = "DEVELOPMENT FIXTURE PREVIEW")
                             Text(
@@ -144,14 +164,22 @@ fun WalletScreen(
                                 color = ShareDabbaTextSecondary
                             )
                             Text(
-                                text = metrics.availableBalanceDisplay,
+                                text = ledger.availableBalanceDisplay,
                                 style = MaterialTheme.typography.headlineMedium,
-                                color = ShareDabbaCyan
+                                color = ShareDabbaCyan,
+                                modifier = Modifier.testTag("wallet_available_balance_value")
                             )
                             Text(
-                                text = "Pending Verification Balance: ${metrics.pendingBalanceDisplay}",
+                                text = "Pending Verification Balance: ${ledger.pendingEarningsDisplay}",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = ShareDabbaWhite
+                                color = ShareDabbaWhite,
+                                modifier = Modifier.testTag("wallet_pending_balance_value")
+                            )
+                            Text(
+                                text = "Confirmed Total Earnings: ${ledger.confirmedEarningsDisplay}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ShareDabbaCyan,
+                                modifier = Modifier.testTag("wallet_confirmed_earnings_value")
                             )
                             Text(
                                 text = "All balances and payout requests are governed by the authoritative ShareDabba website ledger (${environmentConfig.websiteBaseUrl}).",
@@ -196,6 +224,132 @@ fun WalletScreen(
                         }
                     }
 
+                    // Stage 9 Authenticated Withdrawal Request Card (Duplicate Guard + Non-Client-Paid Guarantee)
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, ShareDabbaCyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                            .testTag("wallet_withdrawal_submission_card"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = ShareDabbaSurface)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ShareDabbaGradientBadge(text = "STAGE 9 AUTHENTICATED PAYOUT REQUEST")
+                            Text(
+                                text = "Submit Authenticated Withdrawal Request",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = ShareDabbaWhite
+                            )
+                            Text(
+                                text = "Payouts require server verification. Client responses NEVER mark a withdrawal as paid/completed.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ShareDabbaTextSecondary
+                            )
+
+                            OutlinedTextField(
+                                value = amountInput,
+                                onValueChange = { amountInput = it },
+                                label = { Text("Withdrawal Amount (USD)") },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("wallet_withdrawal_amount_input")
+                            )
+
+                            OutlinedTextField(
+                                value = destinationInput,
+                                onValueChange = { destinationInput = it },
+                                label = { Text("Verified Payout Destination") },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("wallet_withdrawal_destination_input")
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        val parsedAmount = amountInput.toDoubleOrNull() ?: 0.0
+                                        val ownerUid = authenticatedUserId ?: "usr-aarav-mehta"
+                                        coordinator.submitAuthenticatedWithdrawalRequest(
+                                            authenticatedUid = ownerUid,
+                                            requestedCreatorUid = ownerUid,
+                                            amountUsd = parsedAmount,
+                                            destinationSummary = destinationInput,
+                                            idempotencyKey = "wd-key-${idempotencySequence++}"
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("wallet_submit_withdrawal_button"),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = ShareDabbaCyan,
+                                        contentColor = ShareDabbaBlack
+                                    )
+                                ) {
+                                    Text("Submit Request")
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        val parsedAmount = amountInput.toDoubleOrNull() ?: 45.0
+                                        val ownerUid = authenticatedUserId ?: "usr-aarav-mehta"
+                                        coordinator.submitAuthenticatedWithdrawalRequest(
+                                            authenticatedUid = ownerUid,
+                                            requestedCreatorUid = ownerUid,
+                                            amountUsd = parsedAmount,
+                                            destinationSummary = destinationInput,
+                                            idempotencyKey = "wd-duplicate-fixed-key"
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("wallet_test_duplicate_withdrawal_button")
+                                ) {
+                                    Text("Test Duplicate Guard", color = ShareDabbaWhite)
+                                }
+                            }
+
+                            ledger.sessionSubmittedWithdrawals.firstOrNull()?.let { latest ->
+                                WithdrawalSubmissionStatusBanner(record = latest)
+                            }
+                        }
+                    }
+
+                    // Missing Backend Payout Integration Report
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, ShareDabbaOutline, RoundedCornerShape(16.dp))
+                            .testTag("wallet_missing_backend_report_card"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = ShareDabbaSurface)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "Missing Backend Monetization & Payout Integration Report",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = ShareDabbaWhite
+                            )
+                            ledger.missingBackendIntegrationReport.forEach { line ->
+                                Text(
+                                    text = "• $line",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ShareDabbaTextSecondary
+                                )
+                            }
+                        }
+                    }
+
                     ShareDabbaSectionCard(
                         title = "Unified Website Wallet Ledger",
                         packagePath = "${environmentConfig.apiBaseUrl}wallet",
@@ -217,13 +371,48 @@ fun WalletScreen(
     }
 }
 
+@Composable
+private fun WithdrawalSubmissionStatusBanner(record: WithdrawalSubmissionRecord) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, ShareDabbaOutline, RoundedCornerShape(12.dp))
+            .testTag("wallet_latest_submission_status_card"),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = ShareDabbaBlack)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            ShareDabbaGradientBadge(text = record.status.badgeLabel)
+            Text(
+                text = "${record.amountDisplay} → ${record.destinationSummary}",
+                style = MaterialTheme.typography.labelLarge,
+                color = ShareDabbaWhite
+            )
+            Text(
+                text = "Marked Paid by Client Alone: ${record.isMarkedPaidByClientAlone} (Always false)",
+                style = MaterialTheme.typography.labelSmall,
+                color = ShareDabbaCyan
+            )
+            Text(
+                text = record.serverStatusMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = ShareDabbaTextSecondary
+            )
+        }
+    }
+}
+
 /**
  * Screen 15: Withdrawal History Screen
- * Displays past and pending withdrawal entries from `DevFixturesCatalog.withdrawalHistory`
- * with status filter chips and Loading / Empty / Error / Data states.
+ * Displays session-submitted withdrawal requests (always awaiting server verification, never client-finalized)
+ * alongside past and pending withdrawal entries from `DevFixturesCatalog.withdrawalHistory`.
  */
 @Composable
 fun WithdrawalHistoryScreen(
+    monetizationCoordinator: MonetizationCoordinator? = null,
     onBackClick: () -> Unit
 ) {
     BackHandler(onBack = onBackClick)
@@ -231,7 +420,13 @@ fun WithdrawalHistoryScreen(
     var stateMode by rememberSaveable { mutableStateOf(PreviewStateMode.DATA) }
     var selectedFilter by rememberSaveable { mutableStateOf("All") }
 
-    val filteredWithdrawals = DevFixturesCatalog.withdrawalHistory.filter { item ->
+    val fallbackEnv = remember { EnvironmentConfig() }
+    val coordinator = remember(monetizationCoordinator) {
+        monetizationCoordinator ?: MonetizationCoordinator(fallbackEnv, RemoteConfigManager(fallbackEnv))
+    }
+    val ledger by coordinator.ledgerSnapshot.collectAsStateWithLifecycle()
+
+    val filteredWithdrawals = ledger.withdrawalHistory.filter { item ->
         when (selectedFilter) {
             "Completed" -> item.status.contains("Completed", ignoreCase = true)
             "Pending" -> item.status.contains("Pending", ignoreCase = true)
@@ -318,6 +513,12 @@ fun WithdrawalHistoryScreen(
             }
 
             PreviewStateMode.DATA -> {
+                items(ledger.sessionSubmittedWithdrawals, key = { it.requestId }) { submitted ->
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        WithdrawalSubmissionStatusBanner(record = submitted)
+                    }
+                }
+
                 items(filteredWithdrawals, key = { it.id }) { item ->
                     WithdrawalRecordCard(item = item)
                 }

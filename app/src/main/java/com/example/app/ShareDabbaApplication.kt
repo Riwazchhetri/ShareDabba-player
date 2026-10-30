@@ -2,6 +2,7 @@ package com.example.app
 
 import android.app.Application
 import com.example.R
+import com.example.advertisements.MonetizationCoordinator
 import com.example.authentication.SessionTokenCoordinator
 import com.example.core.ai.AiAssistantService
 import com.example.core.config.EnvironmentConfig
@@ -13,6 +14,8 @@ import com.example.data.repository.WebsiteVideoLibraryRepository
 import com.example.domain.usecase.SyncBookmarkUseCase
 import com.example.network.NetworkClient
 import com.example.network.ShareDabbaApiService
+import com.example.remoteconfig.RemoteConfigManager
+import com.example.settings.NotificationsAndSettingsCoordinator
 import com.google.firebase.firestore.FirebaseFirestore
 
 /**
@@ -57,6 +60,22 @@ class AppContainer(context: Application) {
         WebsiteVideoLibraryRepository(environmentConfig, apiService)
     }
 
+    val remoteConfigManager: RemoteConfigManager by lazy {
+        RemoteConfigManager(environmentConfig)
+    }
+
+    val monetizationCoordinator: MonetizationCoordinator by lazy {
+        MonetizationCoordinator(environmentConfig, remoteConfigManager)
+    }
+
+    val notificationsAndSettingsCoordinator: NotificationsAndSettingsCoordinator by lazy {
+        NotificationsAndSettingsCoordinator(
+            context = context.applicationContext,
+            environmentConfig = environmentConfig,
+            remoteConfigManager = remoteConfigManager
+        )
+    }
+
     val aiAssistantService: AiAssistantService by lazy {
         AiAssistantService()
     }
@@ -69,6 +88,7 @@ class ShareDabbaApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.remoteConfigManager.fetchOnAppLaunch()
         AppLogger.i(
             "ShareDabbaApp",
             "ShareDabbaApplication initialized (appId=${container.environmentConfig.applicationId})"

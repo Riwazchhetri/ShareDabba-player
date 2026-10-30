@@ -472,21 +472,46 @@ fun ProfileScreen(
 }
 
 /**
- * Screen 16: Notifications Screen
+ * Screen 16: Notifications Screen (Updated for Stage 10 Notifications & Settings)
+ * Supports:
+ * - In-app notifications across all 6 required categories:
+ *   1. Upload completion notifications
+ *   2. Account notifications
+ *   3. Withdrawal status notifications
+ *   4. Important platform announcements
+ *   5. Maintenance notices
+ *   6. App update notices
+ * - Honest delivery status badges (never inventing FCM push or OS tray delivery success)
+ * - Deep-link destination routing (opening exact videos in native player or internal destinations)
+ * - Expired-session protection for private user notifications
  */
 @Composable
 fun NotificationsScreen(
+    notificationsCoordinator: com.example.settings.NotificationsAndSettingsCoordinator? = null,
+    sessionTokenCoordinator: SessionTokenCoordinator? = null,
     onNavigate: (String) -> Unit,
+    onOpenDeepLinkVideoInPlayer: (String) -> Unit = {},
     onBackClick: () -> Unit
 ) {
     BackHandler(onBack = onBackClick)
 
-    var stateMode by rememberSaveable { mutableStateOf(PreviewStateMode.DATA) }
-    val notifications = remember {
-        mutableStateListOf<NotificationItemFixture>().apply {
-            addAll(DevFixturesCatalog.initialNotifications)
-        }
+    val context = LocalContext.current
+    val fallbackEnv = remember { EnvironmentConfig() }
+    val coordinator = remember(notificationsCoordinator) {
+        notificationsCoordinator ?: com.example.settings.NotificationsAndSettingsCoordinator(
+            context = context.applicationContext,
+            environmentConfig = fallbackEnv,
+            remoteConfigManager = com.example.remoteconfig.RemoteConfigManager(fallbackEnv)
+        )
     }
+
+    val notifications by coordinator.notifications.collectAsStateWithLifecycle()
+    val preferences by coordinator.preferences.collectAsStateWithLifecycle()
+    val lastNavResolution by coordinator.lastNavigationResolution.collectAsStateWithLifecycle()
+    val sessionStatus = sessionTokenCoordinator?.sessionStatus?.collectAsStateWithLifecycle()?.value
+    val isSessionExpired = sessionStatus?.isTokenExpired == true
+
+    var stateMode by rememberSaveable { mutableStateOf(PreviewStateMode.DATA) }
 
     LazyColumn(
         modifier = Modifier
@@ -499,7 +524,7 @@ fun NotificationsScreen(
         item {
             ShareDabbaTopBar(
                 title = "Notifications",
-                subtitle = "Creator & Platform Alerts",
+                subtitle = "Stage 10 • Creator, Platform, Maintenance & Security Alerts",
                 onBackClick = onBackClick
             )
         }
@@ -517,16 +542,96 @@ fun NotificationsScreen(
                     onModeChange = { stateMode = it }
                 )
 
+                // Stage 10 Delivery, Permission, Deep-Link & Expired Session Audit Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, ShareDabbaCyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        .testTag("notifications_stage10_audit_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = ShareDabbaSurface)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ShareDabbaGradientBadge(text = "STAGE 10 DELIVERY & DEEP-LINK VERIFIER")
+                        Text(
+                            text = "Permission: ${preferences.permissionStatus.label}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = ShareDabbaCyan
+                        )
+                        Text(
+                            text = "Session State: ${if (isSessionExpired) "EXPIRED (401) — Private alerts blocked" else "ACTIVE"} • ${preferences.fcmIntegrationStatus}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isSessionExpired) ShareDabbaWarning else ShareDabbaTextSecondary
+                        )
+                        Text(
+                            text = preferences.lastDeliveryAuditMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ShareDabbaWhite,
+                            modifier = Modifier.testTag("notifications_audit_message_text")
+                        )
+
+                        lastNavResolution?.let { navRes ->
+                            Text(
+                                text = "Last Tap Resolution [${navRes.outcome.name}]: ${navRes.explanation}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ShareDabbaCyan,
+                                modifier = Modifier.testTag("notifications_last_nav_resolution_text")
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    coordinator.dispatchOrEvaluateNotification(
+                                        id = "notif_test_upload_${System.currentTimeMillis() % 10000}",
+                                        category = com.example.settings.ShareDabbaNotificationCategory.UPLOAD_COMPLETION,
+                                        title = "Upload Check Complete",
+                                        message = "Deep-link ready: https://sharedabba.com/v/vid_featured_1",
+                                        targetRoute = ShareDabbaDestination.Player.route,
+                                        canonicalDeepLinkUrl = "https://sharedabba.com/v/vid_featured_1",
+                                        isSessionExpired = isSessionExpired
+                                    )
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("notifications_test_delivery_button")
+                            ) {
+                                Text("Test Delivery", color = ShareDabbaWhite)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    coordinator.dispatchOrEvaluateNotification(
+                                        id = "notif_unconfigured_fcm",
+                                        category = com.example.settings.ShareDabbaNotificationCategory.PLATFORM_ANNOUNCEMENT,
+                                        title = "Unconfigured FCM Push",
+                                        message = "Testing unconfigured remote push honesty.",
+                                        targetRoute = ShareDabbaDestination.Home.route,
+                                        isUnconfiguredFcmPushAttempt = true
+                                    )
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("notifications_test_fcm_honesty_button")
+                            ) {
+                                Text("Test FCM Guard", color = ShareDabbaWhite)
+                            }
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
-                        onClick = {
-                            val updated = notifications.map { it.copy(isUnread = false) }
-                            notifications.clear()
-                            notifications.addAll(updated)
-                        },
+                        onClick = { coordinator.markAllNotificationsRead() },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("notifications_mark_all_read_button"),
@@ -541,7 +646,7 @@ fun NotificationsScreen(
                     }
 
                     OutlinedButton(
-                        onClick = { notifications.clear() },
+                        onClick = { coordinator.clearAllNotifications() },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("notifications_clear_all_button")
@@ -572,8 +677,7 @@ fun NotificationsScreen(
                         subtitle = "No new notifications at this time.",
                         actionLabel = "Restore Sample Alerts",
                         onActionClick = {
-                            notifications.clear()
-                            notifications.addAll(DevFixturesCatalog.initialNotifications)
+                            coordinator.restoreDefaultNotifications()
                             stateMode = PreviewStateMode.DATA
                         }
                     )
@@ -597,7 +701,7 @@ fun NotificationsScreen(
                             subtitle = "All notifications have been cleared.",
                             actionLabel = "Restore Sample Alerts",
                             onActionClick = {
-                                notifications.addAll(DevFixturesCatalog.initialNotifications)
+                                coordinator.restoreDefaultNotifications()
                             }
                         )
                     }
@@ -612,7 +716,25 @@ fun NotificationsScreen(
                                     color = if (item.isUnread) ShareDabbaCyan else ShareDabbaOutline,
                                     shape = RoundedCornerShape(16.dp)
                                 )
-                                .clickable { onNavigate(item.targetRoute) }
+                                .clickable {
+                                    val resolution = coordinator.resolveNotificationTapDestination(
+                                        record = item,
+                                        isSessionExpired = isSessionExpired
+                                    )
+                                    when (resolution.outcome) {
+                                        com.example.settings.NotificationNavigationOutcome.OPEN_NATIVE_VIDEO_PLAYER_DEEP_LINK -> {
+                                            val videoKey = resolution.resolvedVideoIdOrStreamUrl
+                                            if (!videoKey.isNullOrBlank()) {
+                                                onOpenDeepLinkVideoInPlayer(videoKey)
+                                            } else {
+                                                onNavigate(resolution.resolvedRoute)
+                                            }
+                                        }
+                                        else -> {
+                                            onNavigate(resolution.resolvedRoute)
+                                        }
+                                    }
+                                }
                                 .testTag("notification_item_${item.id}"),
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = ShareDabbaSurface)
@@ -627,7 +749,7 @@ fun NotificationsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     ShareDabbaGradientBadge(
-                                        text = if (item.isUnread) "NEW" else "READ"
+                                        text = if (item.isUnread) "NEW • ${item.category.title.uppercase()}" else "READ • ${item.category.title.uppercase()}"
                                     )
                                     Text(
                                         text = item.timestampLabel,
@@ -644,6 +766,12 @@ fun NotificationsScreen(
                                     text = item.message,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = ShareDabbaTextSecondary
+                                )
+                                Text(
+                                    text = "Delivery: ${item.deliveryStatus.badgeText}" +
+                                        (item.canonicalDeepLinkUrl?.let { " • Deep Link: $it" } ?: ""),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ShareDabbaCyan
                                 )
                             }
                         }

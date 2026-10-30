@@ -115,13 +115,49 @@ class AuthHeaderInterceptor(
         }
     }
 ) : Interceptor {
+    companion object {
+        private val FORBIDDEN_ADMIN_HEADERS = listOf(
+            "X-Admin-Secret",
+            "X-Admin-Override",
+            "X-Service-Account-Key",
+            "X-Role-Escalation",
+            "X-Payout-Secret"
+        )
+
+        fun validateRequestSecurity(request: Request) {
+            val url = request.url
+            val isLocalLoopback = url.host == "127.0.0.1" || url.host == "localhost"
+            if (!url.isHttps && !isLocalLoopback) {
+                throw SecurityException(
+                    "Cleartext HTTP API request blocked (${url.scheme}://${url.host}). ShareDabba requires HTTPS."
+                )
+            }
+            val encodedPath = url.encodedPath.lowercase()
+            if (encodedPath.startsWith("/admin/write") ||
+                encodedPath.startsWith("/admin/publish") ||
+                encodedPath.startsWith("/admin/privilege")
+            ) {
+                throw SecurityException(
+                    "Admin privilege escalation blocked: Android client is read-only for published Admin config ($encodedPath)."
+                )
+            }
+        }
+    }
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
+        validateRequestSecurity(originalRequest)
+
         val token = tokenProvider()
         val uid = uidProvider()
 
         val requestBuilder = originalRequest.newBuilder()
             .header("Accept", "application/json")
+
+        // Strip any client-injected privilege escalation or secret headers
+        FORBIDDEN_ADMIN_HEADERS.forEach { headerName ->
+            requestBuilder.removeHeader(headerName)
+        }
 
         if (!token.isNullOrBlank()) {
             requestBuilder.header("Authorization", "Bearer $token")
@@ -195,6 +231,10 @@ object NetworkClient {
         val loggingInterceptor = HttpLoggingInterceptor { message ->
             AppLogger.d(TAG, message)
         }.apply {
+            redactHeader("Authorization")
+            redactHeader("Cookie")
+            redactHeader("Set-Cookie")
+            redactHeader("X-ShareDabba-Uid")
             level = if (config.isDebug) {
                 HttpLoggingInterceptor.Level.BASIC
             } else {

@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -135,6 +136,8 @@ fun ShareDabbaMainScaffold(
             }
         }
     }
+
+    val activeRemoteConfig by container.remoteConfigManager.activeConfig.collectAsStateWithLifecycle()
 
     val homeViewModel: HomeViewModel = viewModel(
         key = "home_${currentUser.uid}",
@@ -283,6 +286,7 @@ fun ShareDabbaMainScaffold(
                     composable(ShareDabbaDestination.Home.route) {
                         HomeScreen(
                             viewModel = homeViewModel,
+                            remoteConfig = activeRemoteConfig,
                             onNavigate = { route -> navController.navigate(route) },
                             onOpenVideoDetails = { videoId ->
                                 navController.navigate(ShareDabbaDestination.VideoDetails.createRoute(videoId))
@@ -392,6 +396,8 @@ fun ShareDabbaMainScaffold(
                     composable(ShareDabbaDestination.Wallet.route) {
                         WalletScreen(
                             environmentConfig = container.environmentConfig,
+                            monetizationCoordinator = container.monetizationCoordinator,
+                            authenticatedUserId = currentUser.uid,
                             onOpenWithdrawalHistory = {
                                 navController.navigate(ShareDabbaDestination.WithdrawalHistory.route)
                             },
@@ -403,12 +409,19 @@ fun ShareDabbaMainScaffold(
                     }
                     composable(ShareDabbaDestination.WithdrawalHistory.route) {
                         WithdrawalHistoryScreen(
+                            monetizationCoordinator = container.monetizationCoordinator,
                             onBackClick = { navController.popBackStack() }
                         )
                     }
                     composable(ShareDabbaDestination.Notifications.route) {
                         NotificationsScreen(
+                            notificationsCoordinator = container.notificationsAndSettingsCoordinator,
+                            sessionTokenCoordinator = container.sessionTokenCoordinator,
                             onNavigate = { route -> navController.navigate(route) },
+                            onOpenDeepLinkVideoInPlayer = { videoKey ->
+                                activeStreamUrl = videoKey
+                                navController.navigate(ShareDabbaDestination.Player.route)
+                            },
                             onBackClick = { navController.popBackStack() }
                         )
                     }
@@ -424,7 +437,11 @@ fun ShareDabbaMainScaffold(
                         SettingsScreen(
                             environmentConfig = container.environmentConfig,
                             streamCacheRepository = container.streamCacheRepository,
+                            notificationsCoordinator = container.notificationsAndSettingsCoordinator,
+                            remoteConfigManager = container.remoteConfigManager,
+                            sessionTokenCoordinator = container.sessionTokenCoordinator,
                             onNavigate = { route -> navController.navigate(route) },
+                            onSignedOut = onSignedOut,
                             onBackClick = { navController.popBackStack() }
                         )
                     }
@@ -437,11 +454,14 @@ fun ShareDabbaMainScaffold(
                     composable(ShareDabbaDestination.RemoteConfig.route) {
                         RemoteConfigScreen(
                             environmentConfig = container.environmentConfig,
+                            remoteConfigManager = container.remoteConfigManager,
                             onBackClick = { navController.popBackStack() }
                         )
                     }
                     composable(ShareDabbaDestination.Advertisements.route) {
                         AdvertisementsScreen(
+                            monetizationCoordinator = container.monetizationCoordinator,
+                            remoteConfigManager = container.remoteConfigManager,
                             onBackClick = { navController.popBackStack() }
                         )
                     }
