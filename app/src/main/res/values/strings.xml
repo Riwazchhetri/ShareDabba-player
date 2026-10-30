@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">ShareDabba Player</string>
+    <string name="brand_tagline">Native Streaming &amp; Creator Architecture</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="auth_subtitle">Connect your Google account to access the ShareDabba Android streaming companion, cloud bookmarks, and AI search.</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_player">Player</string>
+    <string name="nav_uploads">Uploads</string>
+    <string name="nav_profile">Hub</string>
+    <string name="no_fake_financial_notice">Connected to ShareDabba API foundation. No fake financial balances or separate production wallets are stored locally.</string>
+</resources>

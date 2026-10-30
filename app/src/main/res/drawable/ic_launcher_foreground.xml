@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Dabba Hexagonal Media Frame -->
+    <path
+        android:pathData="M54,24 L80,39 L80,69 L54,84 L28,69 L28,39 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="28"
+                android:startY="24"
+                android:endX="80"
+                android:endY="84"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#00F0FF" />
+                <item android:offset="1.0" android:color="#9D4EDD" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Inner Dark Cutout -->
+    <path
+        android:fillColor="#090910"
+        android:pathData="M54,30 L74,42 L74,66 L54,78 L34,66 L34,42 Z" />
+    <!-- Bold Central Play Prism -->
+    <path
+        android:pathData="M46,41 L68,54 L46,67 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="46"
+                android:startY="41"
+                android:endX="68"
+                android:endY="67"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#00F0FF" />
+                <item android:offset="0.6" android:color="#5A67F2" />
+                <item android:offset="1.0" android:color="#C77DFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

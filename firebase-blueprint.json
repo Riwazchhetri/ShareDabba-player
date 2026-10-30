@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "StreamBookmark": {
+      "title": "StreamBookmark",
+      "description": "Authenticated client-side stream bookmark synced across the user's Android devices (not a replacement for the ShareDabba website database).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the authenticated Google user who owns this bookmark."
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title of the bookmarked ShareDabba stream or video."
+        },
+        "streamUrl": {
+          "type": "string",
+          "description": "Deep link or HLS/DASH stream URL on ShareDabba."
+        },
+        "category": {
+          "type": "string",
+          "description": "Content category tag (e.g., Live, Creator, Tech, Gaming)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the bookmark was created (must use FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the bookmark was last updated (must use FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "streamUrl",
+        "category",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/bookmarks/{bookmarkId}": {
+      "schema": {
+        "$ref": "#/entities/StreamBookmark"
+      },
+      "description": "Per-user synchronized stream bookmarks for the ShareDabba Android client."
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "ShareDabba Player",
+  "description": "Native Android streaming, creator uploads, earnings, and AI-powered media companion for the ShareDabba platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
