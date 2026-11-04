@@ -17,6 +17,8 @@ import okhttp3.Route
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import retrofit2.http.GET
+import retrofit2.http.Path
 import java.util.concurrent.TimeUnit
 
 /**
@@ -222,7 +224,23 @@ class TokenRefreshAuthenticator(
  * Intentionally contains zero guessed or invented endpoint paths in Stage 2
  * until the website repository or API documentation is provided.
  */
-interface ShareDabbaApiService
+data class GuestPlaybackFile(
+    val name: String,
+    val mimeType: String,
+    val size: Long,
+    val creator: String?
+)
+
+data class GuestPlaybackResponse(
+    val ok: Boolean,
+    val file: GuestPlaybackFile,
+    val playbackUrl: String
+)
+
+interface ShareDabbaApiService {
+    @GET("api/share/{slug}/play")
+    suspend fun getGuestPlayback(@Path("slug") slug: String): GuestPlaybackResponse
+}
 
 object NetworkClient {
     private const val TAG = "NetworkClient"
