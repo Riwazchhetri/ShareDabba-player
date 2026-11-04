@@ -1,6 +1,7 @@
 package com.example.guest
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -171,7 +172,7 @@ private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit) {
         Text(
             "‹  Back",
             color = Color.White,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp).clickable(onClick = onBack)
         )
         Text(title, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         AndroidView(
