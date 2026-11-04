@@ -130,22 +130,32 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
 private fun extractShareSlug(raw: String): String? {
     val value = raw.trim()
     if (value.isEmpty()) return null
+    if (!value.contains("://") && value.matches(Regex("[A-Za-z0-9_-]{3,128}"))) {
+        return value
+    }
+
     val uri = try {
-        if (!value.contains("://") && value.matches(Regex("[A-Za-z0-9_-]{3,128}"))) {
-            return value
-        }
         URI(value)
-    } catch (_: Exception) { return null }
+    } catch (_: Exception) {
+        return null
+    }
+    if (uri.userInfo != null || uri.port != -1) return null
+
+    val host = uri.host?.lowercase() ?: return null
     val segments = uri.path.orEmpty().split('/').filter { it.isNotBlank() }
-    val validHost = (uri.scheme == "https" && uri.host?.lowercase() in setOf("sharedabba.com", "www.sharedabba.com")) ||
-        (uri.scheme == "sharedabba" && uri.host?.lowercase() in setOf("v", "watch", "video"))
-    if (!validHost) return null
-    val slug = if (uri.scheme == "sharedabba") {
-        if (uri.host?.lowercase() !in setOf("v", "watch", "video")) return null
-        segments.firstOrNull()
-    } else {
-        if (segments.size < 2 || segments.first().lowercase() !in setOf("v", "watch", "video")) return null
-        segments[1]
+    val slug = when {
+        uri.scheme == "https" && host in setOf("sharedabba.com", "www.sharedabba.com") -> {
+            if (segments.size < 2 || segments.first().lowercase() !in setOf("v", "watch", "video")) return null
+            segments[1]
+        }
+        uri.scheme == "https" && host == "sharedabba-pwa-api.onrender.com" -> {
+            if (segments.size != 2 || segments.first().lowercase() != "s") return null
+            segments[1]
+        }
+        uri.scheme == "sharedabba" && host in setOf("v", "watch", "video") -> {
+            segments.firstOrNull()
+        }
+        else -> return null
     }
     return slug?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{3,128}")) }
 }
