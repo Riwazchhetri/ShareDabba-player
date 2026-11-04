@@ -18,50 +18,31 @@ import com.example.app.AppContainer
 import com.example.app.ShareDabbaApplication
 import com.example.authentication.authStateFlow
 import com.example.core.security.configureAppCheck
-import com.example.ui.navigation.ShareDabbaMainScaffold
 import com.example.guest.GuestPlaybackScreen
+import com.example.ui.navigation.ShareDabbaMainScaffold
 import com.example.ui.theme.ShareDabbaTheme
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 
-private enum class UnauthGateStage {
-    SPLASH,
-    ONBOARDING,
-    AUTH
-}
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // STEP 1: Configure Firebase App Check with launch intent before any UI or Firebase calls
         configureAppCheck(this, intent)
-
         enableEdgeToEdge()
-
-        val initialTarget = intent?.dataString
+        val initialLink = intent?.dataString
 
         setContent {
-            var activeDeepLinkTarget by rememberSaveable { mutableStateOf(initialTarget) }
-
+            var activeLink by rememberSaveable { mutableStateOf(initialLink) }
             DisposableEffect(Unit) {
                 val listener = Consumer<Intent> { newIntent ->
-                    val newTarget = newIntent.dataString
-                    if (!newTarget.isNullOrBlank()) {
-                        activeDeepLinkTarget = newTarget
-                    }
+                    newIntent.dataString?.takeIf { it.isNotBlank() }?.let { activeLink = it }
                 }
                 addOnNewIntentListener(listener)
-                onDispose {
-                    removeOnNewIntentListener(listener)
-                }
+                onDispose { removeOnNewIntentListener(listener) }
             }
-
             ShareDabbaTheme {
-                ShareDabbaRootApp(
-                    initialDeepLinkStreamUrl = activeDeepLinkTarget
-                )
+                ShareDabbaRootApp(initialDeepLink = activeLink)
             }
         }
     }
@@ -70,46 +51,21 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ShareDabbaRootApp(
     auth: FirebaseAuth = Firebase.auth,
-    initialDeepLinkStreamUrl: String? = null
+    initialDeepLink: String? = null
 ) {
     val context = LocalContext.current
     val appContainer = (context.applicationContext as? ShareDabbaApplication)?.container
         ?: AppContainer(context.applicationContext as android.app.Application)
+    val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
 
-    val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(
-        initialValue = auth.currentUser
-    )
-    val user = currentUser
-
-    var unauthStage by rememberSaveable { mutableStateOf(UnauthGateStage.AUTH) }
-
-    if (user == null) {
-        when (unauthStage) {
-            UnauthGateStage.SPLASH -> {
-                SplashScreen(
-                    onSplashFinished = { unauthStage = UnauthGateStage.ONBOARDING }
-                )
-            }
-
-            UnauthGateStage.ONBOARDING -> {
-                OnboardingScreen(
-                    onOnboardingComplete = { unauthStage = UnauthGateStage.AUTH }
-                )
-            }
-
-            UnauthGateStage.AUTH -> {
-                AuthScreen(
-                    onAuthSuccess = { /* AuthStateListener updates currentUser automatically */ },
-                    onReopenOnboarding = { unauthStage = UnauthGateStage.SPLASH }
-                )
-            }
-        }
+    if (currentUser == null) {
+        GuestPlaybackScreen(initialLink = initialDeepLink)
     } else {
         ShareDabbaMainScaffold(
             container = appContainer,
-            currentUser = user,
-            initialDeepLinkStreamUrl = initialDeepLinkStreamUrl,
-            onSignedOut = { /* AuthStateListener returns to AuthScreen */ }
+            currentUser = currentUser!!,
+            initialDeepLinkStreamUrl = initialDeepLink,
+            onSignedOut = { }
         )
     }
 }
