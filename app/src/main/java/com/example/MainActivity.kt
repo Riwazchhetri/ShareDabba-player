@@ -11,36 +11,42 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.util.Consumer
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.app.AppContainer
-import com.example.app.ShareDabbaApplication
-import com.example.authentication.authStateFlow
 import com.example.core.security.configureAppCheck
 import com.example.guest.GuestPlaybackScreen
-import com.example.ui.navigation.ShareDabbaMainScaffold
 import com.example.ui.theme.ShareDabbaTheme
-import com.google.firebase.Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.auth
 
+/**
+ * ShareDabba's public player entry point.
+ *
+ * Guest playback is intentionally independent of Firebase Authentication:
+ * installing/opening the player must never require a Firebase user session.
+ * This also keeps the app launchable when optional Firebase client config is
+ * absent from a local/debug build.
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // App Check is optional for guest playback. Its initializer handles
+        // missing Firebase configuration internally and must not block launch.
         configureAppCheck(this, intent)
         enableEdgeToEdge()
-        val initialLink = intent?.dataString
 
+        val initialLink = intent?.dataString
         setContent {
             var activeLink by rememberSaveable { mutableStateOf(initialLink) }
+
             DisposableEffect(Unit) {
                 val listener = Consumer<Intent> { newIntent ->
-                    newIntent.dataString?.takeIf { it.isNotBlank() }?.let { activeLink = it }
+                    newIntent.dataString
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { activeLink = it }
                 }
                 addOnNewIntentListener(listener)
                 onDispose { removeOnNewIntentListener(listener) }
             }
+
             ShareDabbaTheme {
                 ShareDabbaRootApp(initialDeepLink = activeLink)
             }
@@ -49,25 +55,8 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ShareDabbaRootApp(
-    auth: FirebaseAuth = Firebase.auth,
-    initialDeepLink: String? = null
-) {
-    val context = LocalContext.current
-    val appContainer = (context.applicationContext as? ShareDabbaApplication)?.container
-        ?: AppContainer(context.applicationContext as android.app.Application)
-    val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
-
-    // Share links always enter guest playback, including for signed-in users.
-    // Normal signed-in launches continue to show the existing dashboard.
-    if (currentUser == null || !initialDeepLink.isNullOrBlank()) {
-        GuestPlaybackScreen(initialLink = initialDeepLink)
-    } else {
-        ShareDabbaMainScaffold(
-            container = appContainer,
-            currentUser = currentUser!!,
-            initialDeepLinkStreamUrl = initialDeepLink,
-            onSignedOut = { }
-        )
-    }
+fun ShareDabbaRootApp(initialDeepLink: String? = null) {
+    // Keep the launcher focused on the agreed no-login, paste-a-link player.
+    // Do not touch FirebaseAuth or construct the signed-in dashboard at startup.
+    GuestPlaybackScreen(initialLink = initialDeepLink)
 }
