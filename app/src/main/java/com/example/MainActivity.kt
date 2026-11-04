@@ -16,13 +16,10 @@ import androidx.core.util.Consumer
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.app.AppContainer
 import com.example.app.ShareDabbaApplication
-import com.example.authentication.AuthScreen
 import com.example.authentication.authStateFlow
 import com.example.core.security.configureAppCheck
-import com.example.deeplinks.DeepLinkRouter
-import com.example.onboarding.OnboardingScreen
-import com.example.onboarding.SplashScreen
 import com.example.ui.navigation.ShareDabbaMainScaffold
+import com.example.guest.GuestPlaybackScreen
 import com.example.ui.theme.ShareDabbaTheme
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
@@ -43,14 +40,14 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
 
-        val initialTarget = DeepLinkRouter.extractStreamUrlFromIntent(intent)
+        val initialTarget = intent?.dataString
 
         setContent {
             var activeDeepLinkTarget by rememberSaveable { mutableStateOf(initialTarget) }
 
             DisposableEffect(Unit) {
                 val listener = Consumer<Intent> { newIntent ->
-                    val newTarget = DeepLinkRouter.extractStreamUrlFromIntent(newIntent)
+                    val newTarget = newIntent.dataString
                     if (!newTarget.isNullOrBlank()) {
                         activeDeepLinkTarget = newTarget
                     }
