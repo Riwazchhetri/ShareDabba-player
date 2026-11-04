@@ -23,7 +23,7 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     buildConfigField("String", "SHAREDABBA_WEB_BASE_URL", "\"https://sharedabba.com\"")
-    buildConfigField("String", "SHAREDABBA_API_BASE_URL", "\"https://api.sharedabba.com/v1/\"")
+    buildConfigField("String", "SHAREDABBA_API_BASE_URL", "\"https://sharedabba-pwa-api.onrender.com/\"")
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
