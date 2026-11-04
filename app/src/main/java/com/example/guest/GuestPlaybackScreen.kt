@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -137,8 +138,14 @@ private fun extractShareSlug(raw: String): String? {
     val validHost = (uri.scheme == "https" && uri.host?.lowercase() in setOf("sharedabba.com", "www.sharedabba.com")) ||
         (uri.scheme == "sharedabba" && uri.host?.lowercase() in setOf("v", "watch", "video"))
     if (!validHost) return null
-    if (segments.size < 2 || segments.first().lowercase() !in setOf("v", "watch", "video")) return null
-    return segments[1].takeIf { it.matches(Regex("[A-Za-z0-9_-]{3,128}")) }
+    val slug = if (uri.scheme == "sharedabba") {
+        if (uri.host?.lowercase() !in setOf("v", "watch", "video")) return null
+        segments.firstOrNull()
+    } else {
+        if (segments.size < 2 || segments.first().lowercase() !in setOf("v", "watch", "video")) return null
+        segments[1]
+    }
+    return slug?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{3,128}")) }
 }
 
 @Composable
