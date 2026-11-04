@@ -58,7 +58,9 @@ fun ShareDabbaRootApp(
         ?: AppContainer(context.applicationContext as android.app.Application)
     val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
 
-    if (currentUser == null) {
+    // Share links always enter guest playback, including for signed-in users.
+    // Normal signed-in launches continue to show the existing dashboard.
+    if (currentUser == null || !initialDeepLink.isNullOrBlank()) {
         GuestPlaybackScreen(initialLink = initialDeepLink)
     } else {
         ShareDabbaMainScaffold(
