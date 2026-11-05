@@ -26,9 +26,15 @@ object AdMobFullscreenAds {
     private var completedVideosThisSession = 0
     private var isInterstitialShowing = false
 
-    private const val MIN_FULLSCREEN_GAP_MS = 180_000L
-    private const val MAX_FULLSCREEN_IMPRESSIONS_PER_SESSION = 4
-    private const val VIDEOS_BETWEEN_INTERSTITIALS = 5
+    private var minFullscreenGapMs = 180_000L
+    private var maxFullscreenImpressionsPerSession = 4
+    private var videosBetweenInterstitials = 5
+
+    fun configurePacing(cooldownSeconds: Int, maxAdsPerSession: Int, everyNVideos: Int) {
+        minFullscreenGapMs = cooldownSeconds.coerceIn(0, 3600) * 1000L
+        maxFullscreenImpressionsPerSession = maxAdsPerSession.coerceIn(0, 20)
+        videosBetweenInterstitials = everyNVideos.coerceIn(1, 50)
+    }
 
     fun startPreloading(interstitialUnitId: String?, rewardedUnitId: String?) {
         if (!AdMobRuntime.isInitialized.value) return
@@ -60,9 +66,9 @@ object AdMobFullscreenAds {
         val now = System.currentTimeMillis()
         val eligible = id != null &&
             !isInterstitialShowing &&
-            interstitialImpressionsThisSession < MAX_FULLSCREEN_IMPRESSIONS_PER_SESSION &&
-            completedVideosThisSession >= VIDEOS_BETWEEN_INTERSTITIALS &&
-            (lastFullscreenImpressionAtMs == 0L || now - lastFullscreenImpressionAtMs >= MIN_FULLSCREEN_GAP_MS)
+            interstitialImpressionsThisSession < maxFullscreenImpressionsPerSession &&
+            completedVideosThisSession >= videosBetweenInterstitials &&
+            (lastFullscreenImpressionAtMs == 0L || now - lastFullscreenImpressionAtMs >= minFullscreenGapMs)
 
         if (!eligible) {
             onFinished()
@@ -87,8 +93,8 @@ object AdMobFullscreenAds {
 
         ad.adEventCallback = object : InterstitialAdEventCallback {
             override fun onAdShowedFullScreenContent() = Unit
-            override fun onAdDismissedFullScreenContent() = finishOnce()
-            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) = finishOnce()
+            override fun onAdDismissedFullScreenContent() { activity.runOnUiThread { finishOnce() } }
+            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) { activity.runOnUiThread { finishOnce() } }
             override fun onAdImpression() {
                 lastFullscreenImpressionAtMs = System.currentTimeMillis()
                 interstitialImpressionsThisSession += 1
@@ -135,7 +141,9 @@ object AdMobFullscreenAds {
         }
         return try {
             ad.show(activity) { rewardItem ->
-                onRewardEarned(rewardItem.amount, rewardItem.type)
+                activity.runOnUiThread {
+                    onRewardEarned(rewardItem.amount, rewardItem.type)
+                }
             }
             true
         } catch (_: Exception) {
