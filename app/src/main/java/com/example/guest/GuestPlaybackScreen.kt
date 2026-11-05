@@ -41,6 +41,7 @@ import androidx.media3.ui.PlayerView
 import com.example.core.config.EnvironmentConfig
 import com.example.advertisements.AdMobConsentManager
 import com.example.advertisements.AdMobConfig
+import com.example.BuildConfig
 import com.example.advertisements.AdMobFullscreenAds
 import com.example.advertisements.AdMobRuntime
 import com.example.advertisements.ShareDabbaBannerAd
@@ -72,10 +73,16 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
     val interstitialAdsEnabled = googleAdsApproved && remoteConfig.advertising.enableInterstitialPlacements
     val rewardedAdsEnabled = googleAdsApproved && remoteConfig.advertising.enableRewardedPlacements
     val adsSdkInitialized by AdMobRuntime.isInitialized.collectAsState()
-    val interstitialUnitId = remoteConfig.advertising.interstitialAdUnitId
-        .ifBlank { AdMobConfig.interstitialUnitId }
-    val rewardedUnitId = remoteConfig.advertising.rewardedAdUnitId
-        .ifBlank { AdMobConfig.rewardedUnitId }
+    val interstitialUnitId = if (BuildConfig.DEBUG) {
+        AdMobConfig.interstitialUnitId
+    } else {
+        remoteConfig.advertising.interstitialAdUnitId.ifBlank { AdMobConfig.interstitialUnitId }
+    }
+    val rewardedUnitId = if (BuildConfig.DEBUG) {
+        AdMobConfig.rewardedUnitId
+    } else {
+        remoteConfig.advertising.rewardedAdUnitId.ifBlank { AdMobConfig.rewardedUnitId }
+    }
 
     LaunchedEffect(adsSdkInitialized, interstitialAdsEnabled, rewardedAdsEnabled, interstitialUnitId, rewardedUnitId) {
         if (adsSdkInitialized) {
