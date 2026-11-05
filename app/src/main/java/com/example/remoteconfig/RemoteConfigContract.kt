@@ -3,6 +3,11 @@ package com.example.remoteconfig
 import com.example.core.config.EnvironmentConfig
 import com.example.core.logging.AppLogger
 import com.example.network.IntegrationContractRegistry
+import com.example.network.NetworkClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,12 +68,14 @@ data class AdminAdvertisingConfig(
     val bannerAdUnitId: String = "",
     val interstitialAdUnitId: String = "",
     val rewardedAdUnitId: String = "",
+    val rewardedInterstitialAdUnitId: String = "",
     val enableBannerPlacements: Boolean = false,
     val enableInterstitialPlacements: Boolean = false,
     val enableRewardedPlacements: Boolean = false,
     val adFrequencyEveryNVideos: Int = 5,
     val adCooldownSeconds: Int = 180,
     val maxAdsPerSession: Int = 4,
+    val adTestModeEnabled: Boolean = true,
     val adTestModeEnabled: Boolean = true,
     val adFallbackStrategy: String = "NO_AD_CONTINUE_CONTENT"
 )
@@ -324,6 +331,8 @@ class RemoteConfigManager(
         const val MIN_REFRESH_INTERVAL_MS: Long = 15 * 60 * 1000L // 15 minutes
     }
 
+    private val apiService by lazy { NetworkClient.createApiService(environmentConfig) }
+    private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _activeConfig = MutableStateFlow(PublishedRemoteConfig.SAFE_DEFAULT)
     val activeConfig: StateFlow<PublishedRemoteConfig> = _activeConfig.asStateFlow()
 
@@ -375,14 +384,48 @@ class RemoteConfigManager(
         networkFetchCount++
         lastFetchTimestampMs = currentTimeMs
 
-        return if (IntegrationContractRegistry.IS_BACKEND_CONNECTION_COMPLETE) {
-            _statusBanner.value = "Fetched live Website Admin Panel configuration (v${_activeConfig.value.configVersion})."
-            _activeConfig.value
-        } else {
-            _statusBanner.value =
-                "Website Admin Panel API (${environmentConfig.apiBaseUrl}config) awaiting repo connection; serving validated cached v${_activeConfig.value.configVersion}."
-            _activeConfig.value
+        _statusBanner.value = "Fetching live Website Admin Panel advertising settings."
+        refreshScope.launch {
+            try {
+                val response = apiService.getAndroidRemoteConfig()
+                val ads = response.advertising
+                val current = _activeConfig.value
+                val candidate = current.copy(
+                    configVersion = current.configVersion + 1,
+                    publishedAtIso = response.serverTimestamp ?: current.publishedAtIso,
+                    sourceLabel = "WEBSITE_ADMIN_PANEL_API",
+                    advertising = AdminAdvertisingConfig(
+                        approvedAdProvider = ads.approvedAdProvider,
+                        bannerAdUnitId = ads.bannerAdUnitId,
+                        interstitialAdUnitId = ads.interstitialAdUnitId,
+                        rewardedInterstitialAdUnitId = ads.rewardedInterstitialAdUnitId,
+                        rewardedAdUnitId = ads.rewardedAdUnitId,
+                        enableBannerPlacements = ads.enableBannerPlacements,
+                        enableInterstitialPlacements = ads.enableInterstitialPlacements,
+                        enableRewardedPlacements = ads.enableRewardedPlacements,
+                        adFrequencyEveryNVideos = ads.adFrequencyEveryNVideos,
+                        adCooldownSeconds = ads.adCooldownSeconds,
+                        maxAdsPerSession = ads.maxAdsPerSession,
+                        adTestModeEnabled = ads.adTestModeEnabled,
+                        adFallbackStrategy = ads.adFallbackStrategy
+                    ),
+                    appManagement = current.appManagement.copy(
+                        maintenanceModeEnabled = response.platform.maintenanceMode,
+                        maintenanceMessage = response.platform.maintenanceMessage.ifBlank {
+                            current.appManagement.maintenanceMessage
+                        }
+                    )
+                )
+                val report = applyAdminPanelConfigUpdate(candidate)
+                _statusBanner.value = "Synced live Website Admin Panel config v" +
+                    report.sanitizedConfig.configVersion + "."
+            } catch (error: Exception) {
+                _statusBanner.value = "Admin Panel sync failed; keeping last safe config. " +
+                    (error.message ?: "")
+                AppLogger.e(TAG, "Failed to fetch Android Admin Panel config", error)
+            }
         }
+        return _activeConfig.value
     }
 
     /**
