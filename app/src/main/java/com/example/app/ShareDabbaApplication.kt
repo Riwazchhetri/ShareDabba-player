@@ -15,6 +15,10 @@ import com.example.domain.usecase.SyncBookmarkUseCase
 import com.example.network.NetworkClient
 import com.example.network.ShareDabbaApiService
 import com.example.remoteconfig.RemoteConfigManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.example.settings.NotificationsAndSettingsCoordinator
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -61,7 +65,7 @@ class AppContainer(context: Application) {
     }
 
     val remoteConfigManager: RemoteConfigManager by lazy {
-        RemoteConfigManager(environmentConfig)
+        RemoteConfigManager(environmentConfig, apiService)
     }
 
     val monetizationCoordinator: MonetizationCoordinator by lazy {
@@ -88,7 +92,9 @@ class ShareDabbaApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        container.remoteConfigManager.fetchOnAppLaunch()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            container.remoteConfigManager.fetchOnAppLaunch()
+        }
         AppLogger.i(
             "ShareDabbaApp",
             "ShareDabbaApplication initialized (appId=${container.environmentConfig.applicationId})"
