@@ -40,6 +40,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.core.config.EnvironmentConfig
 import com.example.advertisements.AdMobConsentManager
+import com.example.advertisements.AdMobConfig
+import com.example.advertisements.AdMobFullscreenAds
+import com.example.advertisements.AdMobRuntime
 import com.example.advertisements.ShareDabbaBannerAd
 import com.example.app.ShareDabbaApplication
 import com.example.remoteconfig.PublishedRemoteConfig
@@ -64,9 +67,24 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
     }
     val remoteConfigState = appContainer?.remoteConfigManager?.activeConfig?.collectAsState()
     val remoteConfig = remoteConfigState?.value ?: PublishedRemoteConfig.SAFE_DEFAULT
-    val bannerAdsEnabled =
-        remoteConfig.advertising.approvedAdProvider == "GOOGLE_ADMOB_APPROVED" &&
-            remoteConfig.advertising.enableBannerPlacements
+    val googleAdsApproved = remoteConfig.advertising.approvedAdProvider == "GOOGLE_ADMOB_APPROVED"
+    val bannerAdsEnabled = googleAdsApproved && remoteConfig.advertising.enableBannerPlacements
+    val interstitialAdsEnabled = googleAdsApproved && remoteConfig.advertising.enableInterstitialPlacements
+    val rewardedAdsEnabled = googleAdsApproved && remoteConfig.advertising.enableRewardedPlacements
+    val adsSdkInitialized by AdMobRuntime.isInitialized.collectAsState()
+    val interstitialUnitId = remoteConfig.advertising.interstitialAdUnitId
+        .ifBlank { AdMobConfig.interstitialUnitId }
+    val rewardedUnitId = remoteConfig.advertising.rewardedAdUnitId
+        .ifBlank { AdMobConfig.rewardedUnitId }
+
+    LaunchedEffect(adsSdkInitialized, interstitialAdsEnabled, rewardedAdsEnabled, interstitialUnitId, rewardedUnitId) {
+        if (adsSdkInitialized && (interstitialAdsEnabled || rewardedAdsEnabled)) {
+            AdMobFullscreenAds.startPreloading(
+                interstitialUnitId = interstitialUnitId.takeIf { interstitialAdsEnabled },
+                rewardedUnitId = rewardedUnitId.takeIf { rewardedAdsEnabled }
+            )
+        }
+    }
     val scope = rememberCoroutineScope()
     val config = remember { EnvironmentConfig() }
     val api = remember { NetworkClient.createApiService(config) }
@@ -83,7 +101,14 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
 
     Box(Modifier.fillMaxSize().background(Color(0xFF101014))) {
         if (playbackUrl != null) {
-            GuestVideoSurface(url = playbackUrl!!, title = videoTitle, onBack = { playbackUrl = null }, bannerAdsEnabled = bannerAdsEnabled)
+            GuestVideoSurface(
+                url = playbackUrl!!,
+                title = videoTitle,
+                onBack = { playbackUrl = null },
+                bannerAdsEnabled = bannerAdsEnabled,
+                interstitialAdsEnabled = interstitialAdsEnabled,
+                rewardedAdsEnabled = rewardedAdsEnabled
+            )
         } else {
             Column(
                 modifier = Modifier.align(Alignment.Center).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -213,8 +238,19 @@ private fun extractShareSlug(raw: String): String? {
 }
 
 @Composable
-private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit, bannerAdsEnabled: Boolean) {
+private fun GuestVideoSurface(
+    url: String,
+    title: String,
+    onBack: () -> Unit,
+    bannerAdsEnabled: Boolean,
+    interstitialAdsEnabled: Boolean,
+    rewardedAdsEnabled: Boolean
+) {
     val context = LocalContext.current
+    val activity = context as? Activity
+    var skipNextInterstitial by remember(url) { mutableStateOf(false) }
+    var rewardMessage by remember(url) { mutableStateOf<String?>(null) }
+    LaunchedEffect(url) { AdMobFullscreenAds.onVideoStarted() }
     val player = remember(url) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(url))
@@ -234,9 +270,36 @@ private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit, ba
         Text(
             "‹  Back",
             color = Color.White,
-            modifier = Modifier.padding(16.dp).clickable(onClick = onBack)
+            modifier = Modifier.padding(16.dp).clickable {
+                if (skipNextInterstitial || !interstitialAdsEnabled || activity == null) {
+                    skipNextInterstitial = false
+                    onBack()
+                } else {
+                    AdMobFullscreenAds.showInterstitialAtTransition(activity, onFinished = onBack)
+                }
+            }
         )
         Text(title, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        if (rewardedAdsEnabled && activity != null) {
+            TextButton(
+                onClick = {
+                    val shown = AdMobFullscreenAds.showRewardedAfterOptIn(
+                        activity = activity,
+                        onRewardEarned = { _, _ ->
+                            skipNextInterstitial = true
+                            rewardMessage = "Reward complete: your next full-screen ad is skipped."
+                        }
+                    )
+                    if (!shown) rewardMessage = "Reward ad is not ready yet. You can keep watching."
+                },
+                modifier = Modifier.padding(horizontal = 12.dp)
+            ) {
+                Text("Watch ad to skip next full-screen ad", color = Color(0xFFB9A5FF))
+            }
+            rewardMessage?.let { message ->
+                Text(message, color = Color(0xFFB8B8C5), modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            }
+        }
         ShareDabbaBannerAd(
             modifier = Modifier.fillMaxWidth(),
             slotKey = "player-top",
