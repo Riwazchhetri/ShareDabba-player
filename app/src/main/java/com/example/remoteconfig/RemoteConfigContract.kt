@@ -63,7 +63,7 @@ data class AdminVideoPlayerConfig(
  * Group D — ADVERTISING (Website Admin Panel Controlled)
  */
 data class AdminAdvertisingConfig(
-    val approvedAdProvider: String = "NONE", // "NONE", "WEBSITE_VAST"
+    val approvedAdProvider: String = "NONE", // "NONE", "GOOGLE_ADMOB_APPROVED", "WEBSITE_VAST"
     val bannerAdUnitId: String = "",
     val interstitialAdUnitId: String = "",
     val rewardedAdUnitId: String = "",
