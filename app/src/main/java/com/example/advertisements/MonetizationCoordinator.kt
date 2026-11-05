@@ -71,7 +71,7 @@ data class AdEvaluationResult(
  * Client events NEVER increment `confirmedServerRevenueUsd`.
  */
 data class AdTelemetrySnapshot(
-    val consentStatus: UserAdConsentStatus = UserAdConsentStatus.OBTAINED_NON_PERSONALIZED,
+    val consentStatus: UserAdConsentStatus = UserAdConsentStatus.NOT_OBTAINED_BLOCKED,
     val recordedAdImpressions: Int = 0,
     val duplicateImpressionsBlocked: Int = 0,
     val recordedAdClicks: Int = 0,
