@@ -13,6 +13,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.util.Consumer
 import com.example.core.security.configureAppCheck
+import com.example.advertisements.AdMobConfig
+import com.example.advertisements.AdMobConsentManager
+import com.example.advertisements.UserAdConsentStatus
+import com.example.app.ShareDabbaApplication
+import com.google.android.libraries.ads.mobile.sdk.MobileAds
+import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.example.guest.GuestPlaybackScreen
 import com.example.ui.theme.ShareDabbaTheme
 
@@ -49,6 +58,39 @@ class MainActivity : ComponentActivity() {
 
             ShareDabbaTheme {
                 ShareDabbaRootApp(initialDeepLink = activeLink)
+            }
+        }
+
+        beginAdMobConsentFlow()
+    }
+
+    /**
+     * Complete UMP consent before initializing GMA Next-Gen. The SDK may preload ads
+     * during initialization, so initialization is intentionally skipped when UMP
+     * does not permit ad requests.
+     */
+    private fun beginAdMobConsentFlow() {
+        AdMobConsentManager(this).gatherConsent { canRequestAds ->
+            val consentState = if (canRequestAds) {
+                UserAdConsentStatus.UMP_AD_REQUEST_ALLOWED
+            } else {
+                UserAdConsentStatus.NOT_OBTAINED_BLOCKED
+            }
+
+            (application as? ShareDabbaApplication)
+                ?.container
+                ?.monetizationCoordinator
+                ?.updateUserAdConsent(consentState)
+
+            if (canRequestAds) {
+                lifecycleScope.launch(Dispatchers.IO) {
+                    if (!MobileAds.isInitialized) {
+                        MobileAds.initialize(
+                            applicationContext,
+                            InitializationConfig.Builder(AdMobConfig.APP_ID).build()
+                        )
+                    }
+                }
             }
         }
     }
