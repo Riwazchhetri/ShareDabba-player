@@ -14,7 +14,6 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    // Configurable before release via gradle property or environment variable; defaults to reverse-domain ID
     applicationId = "com.aistudio.sharedabba.vstream"
     minSdk = 24
     targetSdk = 36
@@ -26,8 +25,6 @@ android {
     buildConfigField("String", "SHAREDABBA_API_BASE_URL", "\"https://sharedabba-pwa-api.onrender.com/\"")
   }
 
-  // Do not remove or modify these signingConfigs. They are necessary for building, installing,
-  // and updating Android apps in AI Studio.
   signingConfigs {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
@@ -49,13 +46,9 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
-      // AI Studio.
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
-      // AI Studio.
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }
@@ -77,13 +70,9 @@ android {
 tasks.withType<Test> {
   failFast = true
   timeout.set(Duration.ofMinutes(2))
-  testLogging {
-    events("passed", "failed", "skipped")
-  }
+  testLogging { events("passed", "failed", "skipped") }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
@@ -92,17 +81,11 @@ secrets {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
-// Some unused dependencies are commented out below instead of being removed.
-// This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
-  // implementation(libs.accompanist.permissions)
+  implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.6.0")
   implementation(libs.androidx.activity.compose)
-  // implementation(libs.androidx.camera.camera2)
-  // implementation(libs.androidx.camera.core)
-  // implementation(libs.androidx.camera.lifecycle)
-  // implementation(libs.androidx.camera.view)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
@@ -137,7 +120,6 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
