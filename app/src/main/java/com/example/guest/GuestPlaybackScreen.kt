@@ -39,6 +39,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.core.config.EnvironmentConfig
 import com.example.advertisements.ShareDabbaBannerAd
+import com.example.app.ShareDabbaApplication
+import com.example.remoteconfig.PublishedRemoteConfig
+import androidx.compose.runtime.collectAsState
 import com.example.network.NetworkClient
 import kotlinx.coroutines.launch
 import java.net.URI
@@ -48,6 +51,14 @@ private const val API_ROOT = "https://sharedabba-pwa-api.onrender.com"
 @Composable
 fun GuestPlaybackScreen(initialLink: String? = null) {
     val context = LocalContext.current
+    val appContainer = remember(context) {
+        (context.applicationContext as? ShareDabbaApplication)?.container
+    }
+    val remoteConfigState = appContainer?.remoteConfigManager?.activeConfig?.collectAsState()
+    val remoteConfig = remoteConfigState?.value ?: PublishedRemoteConfig.SAFE_DEFAULT
+    val bannerAdsEnabled =
+        remoteConfig.advertising.approvedAdProvider == "GOOGLE_ADMOB_APPROVED" &&
+            remoteConfig.advertising.enableBannerPlacements
     val scope = rememberCoroutineScope()
     val config = remember { EnvironmentConfig() }
     val api = remember { NetworkClient.createApiService(config) }
@@ -64,7 +75,7 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
 
     Box(Modifier.fillMaxSize().background(Color(0xFF101014))) {
         if (playbackUrl != null) {
-            GuestVideoSurface(url = playbackUrl!!, title = videoTitle, onBack = { playbackUrl = null })
+            GuestVideoSurface(url = playbackUrl!!, title = videoTitle, onBack = { playbackUrl = null }, bannerAdsEnabled = bannerAdsEnabled)
         } else {
             Column(
                 modifier = Modifier.align(Alignment.Center).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -73,7 +84,7 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
             ) {
                 ShareDabbaBannerAd(
                     modifier = Modifier.fillMaxWidth(),
-                    slotKey = "home-top"
+                    slotKey = "home-top",\n                    enabled = bannerAdsEnabled
                 )
                 Spacer(Modifier.height(12.dp))
                 Text("ShareDabba Player", color = Color.White, fontSize = 27.sp)
@@ -123,12 +134,12 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
                 }
                 ShareDabbaBannerAd(
                     modifier = Modifier.fillMaxWidth(),
-                    slotKey = "home-below-play"
+                    slotKey = "home-below-play",\n                    enabled = bannerAdsEnabled
                 )
                 Spacer(Modifier.height(8.dp))
                 ShareDabbaBannerAd(
                     modifier = Modifier.fillMaxWidth(),
-                    slotKey = "home-bottom"
+                    slotKey = "home-bottom",\n                    enabled = bannerAdsEnabled
                 )
                 if (!error.isNullOrBlank()) {
                     Spacer(Modifier.height(12.dp))
@@ -177,7 +188,7 @@ private fun extractShareSlug(raw: String): String? {
 }
 
 @Composable
-private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit) {
+private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit, bannerAdsEnabled: Boolean) {
     val context = LocalContext.current
     val player = remember(url) {
         ExoPlayer.Builder(context).build().apply {
@@ -203,7 +214,7 @@ private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit) {
         Text(title, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         ShareDabbaBannerAd(
             modifier = Modifier.fillMaxWidth(),
-            slotKey = "player-top"
+            slotKey = "player-top",\n            enabled = bannerAdsEnabled
         )
         AndroidView(
             factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
@@ -211,7 +222,7 @@ private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit) {
         )
         ShareDabbaBannerAd(
             modifier = Modifier.fillMaxWidth(),
-            slotKey = "player-bottom"
+            slotKey = "player-bottom",\n            enabled = bannerAdsEnabled
         )
     }
 }
