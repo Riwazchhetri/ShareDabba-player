@@ -366,7 +366,7 @@ class RemoteConfigManager(
     val lastValidationReport: StateFlow<RemoteConfigValidationReport> = _lastValidationReport.asStateFlow()
 
     private val _statusBanner = MutableStateFlow(
-        "Initialized with Safe Defaults (v1). Website Admin Panel endpoint: ${environmentConfig.apiBaseUrl}config"
+        "Initialized with Safe Defaults (v1). Website Admin Panel endpoint: ${environmentConfig.apiBaseUrl}api/v1/config/android"
     )
     val statusBanner: StateFlow<String> = _statusBanner.asStateFlow()
 
