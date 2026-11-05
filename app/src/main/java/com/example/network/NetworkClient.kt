@@ -255,6 +255,7 @@ data class AndroidAdvertisingConfigResponse(
     val enableBannerPlacements: Boolean = false,
     val enableInterstitialPlacements: Boolean = false,
     val enableRewardedPlacements: Boolean = false,
+    val enableRewardedInterstitialPlacements: Boolean = false,
     val adFrequencyEveryNVideos: Int = 5,
     val adCooldownSeconds: Int = 180,
     val maxAdsPerSession: Int = 4,
