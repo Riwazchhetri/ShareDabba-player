@@ -75,7 +75,7 @@ object AdMobFullscreenAds {
         val eligible = id != null &&
             !isInterstitialShowing &&
             interstitialImpressionsThisSession < maxFullscreenImpressionsPerSession &&
-            completedVideosThisSession >= videosBetweenInterstitials &&
+            videosStartedSinceLastInterstitial >= videosBetweenInterstitials &&
             (lastFullscreenImpressionAtMs == 0L || now - lastFullscreenImpressionAtMs >= minFullscreenGapMs)
 
         if (!eligible) {
@@ -106,7 +106,7 @@ object AdMobFullscreenAds {
             override fun onAdImpression() {
                 lastFullscreenImpressionAtMs = System.currentTimeMillis()
                 interstitialImpressionsThisSession += 1
-                completedVideosThisSession = 0
+                videosStartedSinceLastInterstitial = 0
             }
             override fun onAdClicked() = Unit
         }
