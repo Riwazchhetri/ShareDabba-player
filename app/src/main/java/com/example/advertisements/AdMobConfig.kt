@@ -21,9 +21,9 @@ object AdMobConfig {
 
     // Google-provided GMA Next-Gen test ad units. Never replace these in debug builds.
     private const val TEST_BANNER = "/21775744923/example/adaptive-banner"
-    private const val TEST_INTERSTITIAL = "/21775744923/example/interstitial"
-    private const val TEST_REWARDED_INTERSTITIAL = "/21775744923/example/rewarded-interstitial"
-    private const val TEST_REWARDED = "/21775744923/example/rewarded"
+    private const val TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/1033173712"
+    private const val TEST_REWARDED_INTERSTITIAL = "ca-app-pub-3940256099942544/5354046379"
+    private const val TEST_REWARDED = "ca-app-pub-3940256099942544/5224354917"
 
     val bannerUnitId: String
         get() = if (BuildConfig.DEBUG) TEST_BANNER else LIVE_BANNER
