@@ -57,7 +57,6 @@ object AdMobFullscreenAds {
         val nextRewardedId = rewardedUnitId?.takeIf { it.isNotBlank() }
         if (configuredRewardedId != nextRewardedId) {
             configuredRewardedId?.let { RewardedAdPreloader.destroy(it) }
-        configuredRewardedInterstitialId?.let { RewardedInterstitialAdPreloader.destroy(it) }
             configuredRewardedId = nextRewardedId
             nextRewardedId?.let { id ->
                 RewardedAdPreloader.start(id, PreloadConfiguration(AdRequest.Builder(id).build()))
@@ -227,6 +226,7 @@ object AdMobFullscreenAds {
     fun stopPreloading() {
         configuredInterstitialId?.let { InterstitialAdPreloader.destroy(it) }
         configuredRewardedId?.let { RewardedAdPreloader.destroy(it) }
+        configuredRewardedInterstitialId?.let { RewardedInterstitialAdPreloader.destroy(it) }
         configuredInterstitialId = null
         configuredRewardedId = null
         configuredRewardedInterstitialId = null
