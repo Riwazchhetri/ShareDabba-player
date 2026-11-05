@@ -42,6 +42,7 @@ enum class AdPlacementType(val label: String) {
 enum class UserAdConsentStatus(val label: String, val canRequestAds: Boolean) {
     OBTAINED_PERSONALIZED("Consent Obtained (Personalized Ads Permitted)", true),
     OBTAINED_NON_PERSONALIZED("Consent Obtained (Non-Personalized Only)", true),
+    UMP_AD_REQUEST_ALLOWED("UMP consent flow permits ad requests", true),
     NOT_OBTAINED_BLOCKED("Consent Not Obtained / Declined (Ads Blocked)", false)
 }
 
