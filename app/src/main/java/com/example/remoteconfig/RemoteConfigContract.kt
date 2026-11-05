@@ -139,7 +139,7 @@ object RemoteConfigValidator {
     )
 
     private val SUPPORTED_QUALITY_IDS = setOf("auto", "1080p", "720p", "480p", "360p")
-    private val BUNDLED_AD_PROVIDERS = setOf("NONE", "WEBSITE_VAST")
+    private val BUNDLED_AD_PROVIDERS = setOf("NONE", "WEBSITE_VAST", "GOOGLE_ADMOB_APPROVED")
     private val HEX_COLOR_REGEX = Regex("^#[0-9A-Fa-f]{6,8}$")
 
     fun containsExecutableCodeOrScript(input: String?): Boolean {
