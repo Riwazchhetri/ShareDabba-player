@@ -84,7 +84,8 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
             ) {
                 ShareDabbaBannerAd(
                     modifier = Modifier.fillMaxWidth(),
-                    slotKey = "home-top",\n                    enabled = bannerAdsEnabled
+                    slotKey = "home-top",
+                    enabled = bannerAdsEnabled
                 )
                 Spacer(Modifier.height(12.dp))
                 Text("ShareDabba Player", color = Color.White, fontSize = 27.sp)
@@ -134,12 +135,14 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
                 }
                 ShareDabbaBannerAd(
                     modifier = Modifier.fillMaxWidth(),
-                    slotKey = "home-below-play",\n                    enabled = bannerAdsEnabled
+                    slotKey = "home-below-play",
+                    enabled = bannerAdsEnabled
                 )
                 Spacer(Modifier.height(8.dp))
                 ShareDabbaBannerAd(
                     modifier = Modifier.fillMaxWidth(),
-                    slotKey = "home-bottom",\n                    enabled = bannerAdsEnabled
+                    slotKey = "home-bottom",
+                    enabled = bannerAdsEnabled
                 )
                 if (!error.isNullOrBlank()) {
                     Spacer(Modifier.height(12.dp))
@@ -214,7 +217,8 @@ private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit, ba
         Text(title, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         ShareDabbaBannerAd(
             modifier = Modifier.fillMaxWidth(),
-            slotKey = "player-top",\n            enabled = bannerAdsEnabled
+            slotKey = "player-top",
+            enabled = bannerAdsEnabled
         )
         AndroidView(
             factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
@@ -222,7 +226,8 @@ private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit, ba
         )
         ShareDabbaBannerAd(
             modifier = Modifier.fillMaxWidth(),
-            slotKey = "player-bottom",\n            enabled = bannerAdsEnabled
+            slotKey = "player-bottom",
+            enabled = bannerAdsEnabled
         )
     }
 }
