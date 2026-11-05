@@ -25,8 +25,9 @@ object AdMobFullscreenAds {
     private var configuredRewardedId: String? = null
     private var lastFullscreenImpressionAtMs = 0L
     private var interstitialImpressionsThisSession = 0
-    private var completedVideosThisSession = 0
+    private var videosStartedSinceLastInterstitial = 0
     private var isInterstitialShowing = false
+    private var isRewardedShowing = false
 
     private var minFullscreenGapMs = 180_000L
     private var maxFullscreenImpressionsPerSession = 4
@@ -61,7 +62,7 @@ object AdMobFullscreenAds {
     }
 
     fun onVideoStarted() {
-        completedVideosThisSession += 1
+        videosStartedSinceLastInterstitial += 1
     }
 
     /**
@@ -129,18 +130,21 @@ object AdMobFullscreenAds {
         onFinished: () -> Unit = {}
     ): Boolean {
         val id = configuredRewardedId ?: return false
+        if (isRewardedShowing) return false
         val ad = RewardedAdPreloader.pollAd(id) ?: return false
+        isRewardedShowing = true
         var finished = false
         fun finishOnce() {
             if (!finished) {
                 finished = true
+                isRewardedShowing = false
                 onFinished()
             }
         }
         ad.adEventCallback = object : RewardedAdEventCallback {
             override fun onAdShowedFullScreenContent() = Unit
-            override fun onAdDismissedFullScreenContent() = finishOnce()
-            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) = finishOnce()
+            override fun onAdDismissedFullScreenContent() { activity.runOnUiThread { finishOnce() } }
+            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) { activity.runOnUiThread { finishOnce() } }
             override fun onAdImpression() {
                 lastFullscreenImpressionAtMs = System.currentTimeMillis()
             }
