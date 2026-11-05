@@ -176,6 +176,7 @@ fun AdvertisementsScreen(
                                             UserAdConsentStatus.OBTAINED_PERSONALIZED -> "Personalized"
                                             UserAdConsentStatus.OBTAINED_NON_PERSONALIZED -> "Non-Personal"
                                             UserAdConsentStatus.NOT_OBTAINED_BLOCKED -> "No Consent"
+                                            UserAdConsentStatus.UMP_AD_REQUEST_ALLOWED -> "UMP Allowed"
                                         }
                                     )
                                 },
