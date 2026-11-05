@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-4643856509495992~3638853837" />
         android:name=".app.ShareDabbaApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
