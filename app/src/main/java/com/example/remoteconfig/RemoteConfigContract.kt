@@ -71,6 +71,7 @@ data class AdminAdvertisingConfig(
     val enableBannerPlacements: Boolean = false,
     val enableInterstitialPlacements: Boolean = false,
     val enableRewardedPlacements: Boolean = false,
+    val enableRewardedInterstitialPlacements: Boolean = false,
     val adFrequencyEveryNVideos: Int = 5,
     val adCooldownSeconds: Int = 180,
     val maxAdsPerSession: Int = 4,
@@ -272,14 +273,17 @@ object RemoteConfigValidator {
         val cleanBannerId = cleanAdUnitId("advertising.bannerAdUnitId", rawAds.bannerAdUnitId)
         val cleanInterstitialId = cleanAdUnitId("advertising.interstitialAdUnitId", rawAds.interstitialAdUnitId)
         val cleanRewardedId = cleanAdUnitId("advertising.rewardedAdUnitId", rawAds.rewardedAdUnitId)
+        val cleanRewardedInterstitialId = cleanAdUnitId("advertising.rewardedInterstitialAdUnitId", rawAds.rewardedInterstitialAdUnitId)
         val cleanAds = rawAds.copy(
             approvedAdProvider = cleanProvider,
             bannerAdUnitId = cleanBannerId,
             interstitialAdUnitId = cleanInterstitialId,
             rewardedAdUnitId = cleanRewardedId,
+            rewardedInterstitialAdUnitId = cleanRewardedInterstitialId,
             enableBannerPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableBannerPlacements && cleanBannerId.isNotEmpty(),
             enableInterstitialPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableInterstitialPlacements && cleanInterstitialId.isNotEmpty(),
             enableRewardedPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableRewardedPlacements && cleanRewardedId.isNotEmpty(),
+            enableRewardedInterstitialPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableRewardedInterstitialPlacements && cleanRewardedInterstitialId.isNotEmpty(),
             adFrequencyEveryNVideos = clampedFreq,
             adCooldownSeconds = clampedCooldown,
             maxAdsPerSession = clampedMaxAds
@@ -420,6 +424,7 @@ class RemoteConfigManager(
                         enableBannerPlacements = ads.enableBannerPlacements,
                         enableInterstitialPlacements = ads.enableInterstitialPlacements,
                         enableRewardedPlacements = ads.enableRewardedPlacements,
+                        enableRewardedInterstitialPlacements = ads.enableRewardedInterstitialPlacements,
                         adFrequencyEveryNVideos = ads.adFrequencyEveryNVideos,
                         adCooldownSeconds = ads.adCooldownSeconds,
                         maxAdsPerSession = ads.maxAdsPerSession,
