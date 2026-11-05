@@ -73,18 +73,15 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
     val interstitialAdsEnabled = googleAdsApproved && remoteConfig.advertising.enableInterstitialPlacements
     val rewardedAdsEnabled = googleAdsApproved && remoteConfig.advertising.enableRewardedPlacements
     val adsSdkInitialized by AdMobRuntime.isInitialized.collectAsState()
-    val interstitialUnitId = if (BuildConfig.DEBUG) {
-        AdMobConfig.interstitialUnitId
-    } else {
-        remoteConfig.advertising.interstitialAdUnitId.ifBlank { AdMobConfig.interstitialUnitId }
-    }
-    val rewardedUnitId = if (BuildConfig.DEBUG) {
-        AdMobConfig.rewardedUnitId
-    } else {
-        remoteConfig.advertising.rewardedAdUnitId.ifBlank { AdMobConfig.rewardedUnitId }
-    }
+    val useTestAds = BuildConfig.DEBUG || remoteConfig.advertising.adTestModeEnabled
+    val bannerUnitId = if (useTestAds) AdMobConfig.testBannerUnitId
+        else remoteConfig.advertising.bannerAdUnitId.ifBlank { AdMobConfig.bannerUnitId }
+    val interstitialUnitId = if (useTestAds) AdMobConfig.testInterstitialUnitId
+        else remoteConfig.advertising.interstitialAdUnitId.ifBlank { AdMobConfig.interstitialUnitId }
+    val rewardedUnitId = if (useTestAds) AdMobConfig.testRewardedUnitId
+        else remoteConfig.advertising.rewardedAdUnitId.ifBlank { AdMobConfig.rewardedUnitId }
 
-    LaunchedEffect(adsSdkInitialized, interstitialAdsEnabled, rewardedAdsEnabled, interstitialUnitId, rewardedUnitId) {
+    LaunchedEffect(adsSdkInitialized, interstitialAdsEnabled, rewardedAdsEnabled, interstitialUnitId, rewardedUnitId, remoteConfig) {
         if (adsSdkInitialized) {
             AdMobFullscreenAds.configurePacing(
                 cooldownSeconds = remoteConfig.advertising.adCooldownSeconds,
@@ -119,7 +116,8 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
                 onBack = { playbackUrl = null },
                 bannerAdsEnabled = bannerAdsEnabled,
                 interstitialAdsEnabled = interstitialAdsEnabled,
-                rewardedAdsEnabled = rewardedAdsEnabled
+                rewardedAdsEnabled = rewardedAdsEnabled,
+                bannerUnitId = bannerUnitId
             )
         } else {
             Column(
@@ -130,7 +128,8 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
                 ShareDabbaBannerAd(
                     modifier = Modifier.fillMaxWidth(),
                     slotKey = "home-top",
-                    enabled = bannerAdsEnabled
+                    enabled = bannerAdsEnabled,
+                    adUnitId = bannerUnitId
                 )
                 Spacer(Modifier.height(12.dp))
                 Text("ShareDabba Player", color = Color.White, fontSize = 27.sp)
@@ -256,7 +255,8 @@ private fun GuestVideoSurface(
     onBack: () -> Unit,
     bannerAdsEnabled: Boolean,
     interstitialAdsEnabled: Boolean,
-    rewardedAdsEnabled: Boolean
+    rewardedAdsEnabled: Boolean,
+    bannerUnitId: String
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
