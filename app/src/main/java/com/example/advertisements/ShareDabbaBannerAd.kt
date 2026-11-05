@@ -25,11 +25,12 @@ import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 @Composable
 fun ShareDabbaBannerAd(
     modifier: Modifier = Modifier,
-    slotKey: String
+    slotKey: String,
+    enabled: Boolean = false
 ) {
     val isInitialized by AdMobRuntime.isInitialized.collectAsState()
     val isPreview = LocalInspectionMode.current
-    if (!isInitialized || isPreview) return
+    if (!enabled || !isInitialized || isPreview) return
 
     val context = LocalContext.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
