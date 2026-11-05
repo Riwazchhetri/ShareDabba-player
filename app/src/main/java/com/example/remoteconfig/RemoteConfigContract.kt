@@ -2,7 +2,6 @@ package com.example.remoteconfig
 
 import com.example.core.config.EnvironmentConfig
 import com.example.core.logging.AppLogger
-import com.example.network.IntegrationContractRegistry
 import com.example.network.NetworkClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -75,7 +74,6 @@ data class AdminAdvertisingConfig(
     val adFrequencyEveryNVideos: Int = 5,
     val adCooldownSeconds: Int = 180,
     val maxAdsPerSession: Int = 4,
-    val adTestModeEnabled: Boolean = true,
     val adTestModeEnabled: Boolean = true,
     val adFallbackStrategy: String = "NO_AD_CONTINUE_CONTENT"
 )
@@ -181,6 +179,16 @@ object RemoteConfigValidator {
             return trimmed
         }
 
+        fun cleanAdUnitId(fieldName: String, value: String): String {
+            val trimmed = value.trim()
+            if (trimmed.isEmpty()) return ""
+            if (!Regex("^ca-app-pub-[0-9]{16}/[0-9]{10}$").matches(trimmed)) {
+                sanitizedFields.add("Invalid AdMob unit ID in '$fieldName'; placement disabled")
+                return ""
+            }
+            return trimmed
+        }
+
         fun cleanHexColor(fieldName: String, value: String, fallback: String): String {
             val trimmed = value.trim()
             if (!HEX_COLOR_REGEX.matches(trimmed)) {
@@ -261,8 +269,17 @@ object RemoteConfigValidator {
         if (clampedCooldown != rawAds.adCooldownSeconds || clampedMaxAds != rawAds.maxAdsPerSession) {
             sanitizedFields.add("Clamped advertising cooldown/maxAdsPerSession to safe bounds")
         }
+        val cleanBannerId = cleanAdUnitId("advertising.bannerAdUnitId", rawAds.bannerAdUnitId)
+        val cleanInterstitialId = cleanAdUnitId("advertising.interstitialAdUnitId", rawAds.interstitialAdUnitId)
+        val cleanRewardedId = cleanAdUnitId("advertising.rewardedAdUnitId", rawAds.rewardedAdUnitId)
         val cleanAds = rawAds.copy(
             approvedAdProvider = cleanProvider,
+            bannerAdUnitId = cleanBannerId,
+            interstitialAdUnitId = cleanInterstitialId,
+            rewardedAdUnitId = cleanRewardedId,
+            enableBannerPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableBannerPlacements && cleanBannerId.isNotEmpty(),
+            enableInterstitialPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableInterstitialPlacements && cleanInterstitialId.isNotEmpty(),
+            enableRewardedPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableRewardedPlacements && cleanRewardedId.isNotEmpty(),
             adFrequencyEveryNVideos = clampedFreq,
             adCooldownSeconds = clampedCooldown,
             maxAdsPerSession = clampedMaxAds
