@@ -20,22 +20,22 @@ object AdMobConfig {
     private const val LIVE_REWARDED = "ca-app-pub-4643856509495992/5929588213"
 
     // Google-provided GMA Next-Gen test ad units. Never replace these in debug builds.
-    private const val TEST_BANNER = "/21775744923/example/adaptive-banner"
-    private const val TEST_INTERSTITIAL = "ca-app-pub-3940256099942544/1033173712"
-    private const val TEST_REWARDED_INTERSTITIAL = "ca-app-pub-3940256099942544/5354046379"
-    private const val TEST_REWARDED = "ca-app-pub-3940256099942544/5224354917"
+    const val testBannerUnitId = "/21775744923/example/adaptive-banner"
+    const val testInterstitialUnitId = "ca-app-pub-3940256099942544/1033173712"
+    const val testRewardedInterstitialUnitId = "ca-app-pub-3940256099942544/5354046379"
+    const val testRewardedUnitId = "ca-app-pub-3940256099942544/5224354917"
 
     val bannerUnitId: String
-        get() = if (BuildConfig.DEBUG) TEST_BANNER else LIVE_BANNER
+        get() = if (BuildConfig.DEBUG) testBannerUnitId else LIVE_BANNER
 
     val interstitialUnitId: String
-        get() = if (BuildConfig.DEBUG) TEST_INTERSTITIAL else LIVE_INTERSTITIAL
+        get() = if (BuildConfig.DEBUG) testInterstitialUnitId else LIVE_INTERSTITIAL
 
     val rewardedInterstitialUnitId: String
-        get() = if (BuildConfig.DEBUG) TEST_REWARDED_INTERSTITIAL else LIVE_REWARDED_INTERSTITIAL
+        get() = if (BuildConfig.DEBUG) testRewardedInterstitialUnitId else LIVE_REWARDED_INTERSTITIAL
 
     val rewardedUnitId: String
-        get() = if (BuildConfig.DEBUG) TEST_REWARDED else LIVE_REWARDED
+        get() = if (BuildConfig.DEBUG) testRewardedUnitId else LIVE_REWARDED
 
     val isUsingTestAds: Boolean
         get() = BuildConfig.DEBUG
