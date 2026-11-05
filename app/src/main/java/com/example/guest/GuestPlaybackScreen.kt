@@ -78,7 +78,7 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
         .ifBlank { AdMobConfig.rewardedUnitId }
 
     LaunchedEffect(adsSdkInitialized, interstitialAdsEnabled, rewardedAdsEnabled, interstitialUnitId, rewardedUnitId) {
-        if (adsSdkInitialized && (interstitialAdsEnabled || rewardedAdsEnabled)) {
+        if (adsSdkInitialized) {
             AdMobFullscreenAds.configurePacing(
                 cooldownSeconds = remoteConfig.advertising.adCooldownSeconds,
                 maxAdsPerSession = remoteConfig.advertising.maxAdsPerSession,
