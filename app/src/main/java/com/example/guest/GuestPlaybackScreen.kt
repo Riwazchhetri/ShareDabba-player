@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import android.app.Activity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +39,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.core.config.EnvironmentConfig
+import com.example.advertisements.AdMobConsentManager
 import com.example.advertisements.ShareDabbaBannerAd
 import com.example.app.ShareDabbaApplication
 import com.example.remoteconfig.PublishedRemoteConfig
@@ -51,6 +53,12 @@ private const val API_ROOT = "https://sharedabba-pwa-api.onrender.com"
 @Composable
 fun GuestPlaybackScreen(initialLink: String? = null) {
     val context = LocalContext.current
+    val activity = context as? Activity
+    val consentManager = remember(activity) { activity?.let { AdMobConsentManager(it) } }
+    var privacyOptionsRequired by remember { mutableStateOf(false) }
+    LaunchedEffect(consentManager) {
+        privacyOptionsRequired = consentManager?.isPrivacyOptionsRequired() == true
+    }
     val appContainer = remember(context) {
         (context.applicationContext as? ShareDabbaApplication)?.container
     }
@@ -147,6 +155,18 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
                 if (!error.isNullOrBlank()) {
                     Spacer(Modifier.height(12.dp))
                     Text(error!!, color = Color(0xFFFF8A8A), fontSize = 14.sp)
+                }
+                if (privacyOptionsRequired) {
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(
+                        onClick = {
+                            consentManager?.showPrivacyOptionsForm {
+                                privacyOptionsRequired = consentManager.isPrivacyOptionsRequired()
+                            }
+                        }
+                    ) {
+                        Text("Privacy settings", color = Color(0xFFB8B8C5))
+                    }
                 }
                 if (creator.isNotBlank()) {
                     Spacer(Modifier.height(12.dp))
