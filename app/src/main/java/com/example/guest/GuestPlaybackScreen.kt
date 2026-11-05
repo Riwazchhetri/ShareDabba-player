@@ -160,8 +160,10 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
                     Spacer(Modifier.height(12.dp))
                     TextButton(
                         onClick = {
-                            consentManager?.showPrivacyOptionsForm {
-                                privacyOptionsRequired = consentManager.isPrivacyOptionsRequired()
+                            consentManager?.let { manager ->
+                                manager.showPrivacyOptionsForm {
+                                    privacyOptionsRequired = manager.isPrivacyOptionsRequired()
+                                }
                             }
                         }
                     ) {
