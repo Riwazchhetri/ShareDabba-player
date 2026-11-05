@@ -36,7 +36,7 @@ fun ShareDabbaBannerAd(
     val context = LocalContext.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val adWidthDp = (screenWidthDp - 24).coerceAtLeast(1)
-    val adView = remember(slotKey) { AdView(context) }
+    val adView = remember(slotKey, adUnitId) { AdView(context) }
     val adSize = remember(adWidthDp) {
         AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, adWidthDp)
     }
