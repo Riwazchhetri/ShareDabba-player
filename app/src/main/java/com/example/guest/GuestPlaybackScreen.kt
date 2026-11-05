@@ -24,11 +24,16 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.core.config.EnvironmentConfig
 import com.example.network.NetworkClient
-import com.google.android.libraries.ads.mobile.sdk.AdLoadCallback
-import com.google.android.libraries.ads.mobile.sdk.AdRequest
-import com.google.android.libraries.ads.mobile.sdk.LoadAdError
+import android.os.Handler
+import android.os.Looper
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
+import com.google.android.libraries.ads.mobile.sdk.banner.AdView
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
 import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAd
 import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
@@ -69,14 +74,18 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
             AdRequest.Builder(TEST_REWARDED_ID).build(),
             object : AdLoadCallback<RewardedAd> {
                 override fun onAdLoaded(ad: RewardedAd) {
-                    rewardedAd = ad
-                    rewardReady = true
-                    adLoading = false
+                    Handler(Looper.getMainLooper()).post {
+                        rewardedAd = ad
+                        rewardReady = true
+                        adLoading = false
+                    }
                 }
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    rewardedAd = null
-                    rewardReady = false
-                    adLoading = false
+                    Handler(Looper.getMainLooper()).post {
+                        rewardedAd = null
+                        rewardReady = false
+                        adLoading = false
+                    }
                 }
             }
         )
@@ -129,12 +138,20 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
         var earned = false
         ad.adEventCallback = object : RewardedAdEventCallback {
             override fun onAdDismissedFullScreenContent() {
-                if (earned) playWithoutReward()
-                preloadRewarded()
+                Handler(Looper.getMainLooper()).post {
+                    if (earned) playWithoutReward()
+                    preloadRewarded()
+                }
             }
-            override fun onAdFailedToShowFullScreenContent(error: com.google.android.libraries.ads.mobile.sdk.FullScreenContentError) {
-                this@GuestPlaybackScreen
-                preloadRewarded()
+            override fun onAdFailedToShowFullScreenContent(error: FullScreenContentError) {
+                Handler(Looper.getMainLooper()).post {
+                    rewardedAd = null
+                    rewardReady = false
+                    adLoading = false
+                    preloadRewarded()
+                    // The user can still choose "Continue without ad".
+                    showUnlockChoice = true
+                }
             }
             override fun onAdShowedFullScreenContent() {}
             override fun onAdImpression() {}
@@ -216,21 +233,39 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
 private fun AdBanner(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val activity = context.findActivity() ?: return
-    var banner by remember { mutableStateOf<BannerAd?>(null) }
-    LaunchedEffect(activity) {
-        val widthDp = (context.resources.displayMetrics.widthPixels / context.resources.displayMetrics.density).toInt().coerceAtLeast(320)
-        val size = AdSize.getLargeAnchoredAdaptiveBannerAdSize(activity, widthDp)
-        when (val result = BannerAd.load(BannerAdRequest.Builder(TEST_BANNER_ID, size).build())) {
-            is com.google.android.libraries.ads.mobile.sdk.AdLoadResult.Success -> banner = result.ad
-            is com.google.android.libraries.ads.mobile.sdk.AdLoadResult.Failure -> banner = null
+    var adView by remember { mutableStateOf<AdView?>(null) }
+    var loaded by remember { mutableStateOf(false) }
+
+    AndroidView(
+        modifier = modifier.wrapContentHeight(),
+        factory = { viewContext ->
+            AdView(viewContext).also { view ->
+                adView = view
+                val widthDp = (context.resources.displayMetrics.widthPixels / context.resources.displayMetrics.density).toInt().coerceAtLeast(320)
+                val size = AdSize.getLargeAnchoredAdaptiveBannerAdSize(activity, widthDp)
+                view.loadAd(
+                    BannerAdRequest.Builder(TEST_BANNER_ID, size).build(),
+                    object : AdLoadCallback<BannerAd> {
+                        override fun onAdLoaded(ad: BannerAd) {
+                            Handler(Looper.getMainLooper()).post { loaded = true }
+                            ad.adEventCallback = object : BannerAdEventCallback {}
+                        }
+                        override fun onAdFailedToLoad(adError: LoadAdError) {
+                            Handler(Looper.getMainLooper()).post { loaded = false }
+                        }
+                    }
+                )
+            }
+        },
+        update = { }
+    )
+    DisposableEffect(adView) {
+        onDispose {
+            adView?.destroy()
+            adView = null
         }
     }
-    DisposableEffect(Unit) { onDispose { banner?.destroy() } }
-    banner?.let { ad ->
-        AndroidView(modifier = modifier.wrapContentHeight(), factory = { ad.getView(activity) })
-    }
 }
-
 private fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is android.content.ContextWrapper -> baseContext.findActivity()
@@ -280,7 +315,7 @@ private fun GuestVideoSurface(url: String, title: String, creator: String, onBac
             }
         }
         AdBanner(Modifier.fillMaxWidth())
-        AndroidView(factory = { ctx -> PlayerView(ctx).apply { player = player; useController = true } }, modifier = Modifier.fillMaxWidth().weight(1f))
+        AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxWidth().weight(1f))
         AdBanner(Modifier.fillMaxWidth())
     }
 }
