@@ -6,6 +6,8 @@ import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
 import com.google.android.libraries.ads.mobile.sdk.common.PreloadConfiguration
 import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAdPreloader
+import com.google.android.libraries.ads.mobile.sdk.rewarded.OnUserEarnedRewardListener
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardItem
 import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdPreloader
 
@@ -145,11 +147,13 @@ object AdMobFullscreenAds {
             override fun onAdClicked() = Unit
         }
         return try {
-            ad.show(activity) { rewardItem ->
-                activity.runOnUiThread {
-                    onRewardEarned(rewardItem.amount, rewardItem.type)
+            ad.show(activity, object : OnUserEarnedRewardListener {
+                override fun onUserEarnedReward(rewardItem: RewardItem) {
+                    activity.runOnUiThread {
+                        onRewardEarned(rewardItem.amount, rewardItem.type)
+                    }
                 }
-            }
+            })
             true
         } catch (_: Exception) {
             finishOnce()
@@ -158,8 +162,8 @@ object AdMobFullscreenAds {
     }
 
     fun stopPreloading() {
-        configuredInterstitialId?.let(InterstitialAdPreloader::destroy)
-        configuredRewardedId?.let(RewardedAdPreloader::destroy)
+        configuredInterstitialId?.let { InterstitialAdPreloader.destroy(it) }
+        configuredRewardedId?.let { RewardedAdPreloader.destroy(it) }
         configuredInterstitialId = null
         configuredRewardedId = null
     }
