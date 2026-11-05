@@ -1,6 +1,7 @@
 package com.example.network
 
 import com.example.core.config.EnvironmentConfig
+import com.example.remoteconfig.PublishedRemoteConfig
 import com.example.core.logging.AppLogger
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -238,6 +239,9 @@ data class GuestPlaybackResponse(
 )
 
 interface ShareDabbaApiService {
+    @GET("api/v1/config/android")
+    suspend fun getAndroidRemoteConfig(): PublishedRemoteConfig
+
     @GET("api/share/{slug}/play")
     suspend fun getGuestPlayback(@Path("slug") slug: String): GuestPlaybackResponse
 }
