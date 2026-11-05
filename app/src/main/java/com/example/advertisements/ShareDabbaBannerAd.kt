@@ -26,7 +26,8 @@ import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 fun ShareDabbaBannerAd(
     modifier: Modifier = Modifier,
     slotKey: String,
-    enabled: Boolean = false
+    enabled: Boolean = false,
+    adUnitId: String = AdMobConfig.bannerUnitId
 ) {
     val isInitialized by AdMobRuntime.isInitialized.collectAsState()
     val isPreview = LocalInspectionMode.current
@@ -45,8 +46,8 @@ fun ShareDabbaBannerAd(
         factory = { adView }
     )
 
-    LaunchedEffect(adView, adSize, slotKey) {
-        val request = BannerAdRequest.Builder(AdMobConfig.bannerUnitId, adSize).build()
+    LaunchedEffect(adView, adSize, slotKey, adUnitId) {
+        val request = BannerAdRequest.Builder(adUnitId, adSize).build()
         adView.loadAd(
             request,
             object : AdLoadCallback<BannerAd> {
