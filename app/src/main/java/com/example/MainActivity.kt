@@ -15,6 +15,7 @@ import androidx.core.util.Consumer
 import com.example.core.security.configureAppCheck
 import com.example.advertisements.AdMobConfig
 import com.example.advertisements.AdMobConsentManager
+import com.example.advertisements.AdMobRuntime
 import com.example.advertisements.UserAdConsentStatus
 import com.example.app.ShareDabbaApplication
 import com.google.android.libraries.ads.mobile.sdk.MobileAds
@@ -89,6 +90,7 @@ class MainActivity : ComponentActivity() {
                             applicationContext,
                             InitializationConfig.Builder(AdMobConfig.APP_ID).build()
                         )
+                        AdMobRuntime.markInitialized()
                     }
                 }
             }
