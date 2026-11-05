@@ -237,9 +237,45 @@ data class GuestPlaybackResponse(
     val playbackUrl: String
 )
 
+
+data class AndroidPlatformConfigResponse(
+    val maintenanceMode: Boolean = false,
+    val maintenanceMessage: String = "",
+    val registrationEnabled: Boolean = true,
+    val announcementBanner: String? = null,
+    val maxUploadSizeMb: Int = 2048
+)
+
+data class AndroidAdvertisingConfigResponse(
+    val approvedAdProvider: String = "NONE",
+    val bannerAdUnitId: String = "",
+    val interstitialAdUnitId: String = "",
+    val rewardedInterstitialAdUnitId: String = "",
+    val rewardedAdUnitId: String = "",
+    val enableBannerPlacements: Boolean = false,
+    val enableInterstitialPlacements: Boolean = false,
+    val enableRewardedPlacements: Boolean = false,
+    val adFrequencyEveryNVideos: Int = 5,
+    val adCooldownSeconds: Int = 180,
+    val maxAdsPerSession: Int = 4,
+    val adTestModeEnabled: Boolean = true,
+    val adFallbackStrategy: String = "NO_AD_CONTINUE_CONTENT",
+    val vastPreRollTagUrl: String = "",
+    val vastMidRollTagUrl: String = ""
+)
+
+data class AndroidRemoteConfigResponse(
+    val platform: AndroidPlatformConfigResponse = AndroidPlatformConfigResponse(),
+    val advertising: AndroidAdvertisingConfigResponse = AndroidAdvertisingConfigResponse(),
+    val serverTimestamp: String? = null
+)
+
 interface ShareDabbaApiService {
     @GET("api/share/{slug}/play")
     suspend fun getGuestPlayback(@Path("slug") slug: String): GuestPlaybackResponse
+
+    @GET("api/v1/config/android")
+    suspend fun getAndroidRemoteConfig(): AndroidRemoteConfigResponse
 }
 
 object NetworkClient {
