@@ -180,13 +180,15 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
                 ShareDabbaBannerAd(
                     modifier = Modifier.fillMaxWidth(),
                     slotKey = "home-below-play",
-                    enabled = bannerAdsEnabled
+                    enabled = bannerAdsEnabled,
+                    adUnitId = bannerUnitId
                 )
                 Spacer(Modifier.height(8.dp))
                 ShareDabbaBannerAd(
                     modifier = Modifier.fillMaxWidth(),
                     slotKey = "home-bottom",
-                    enabled = bannerAdsEnabled
+                    enabled = bannerAdsEnabled,
+                    adUnitId = bannerUnitId
                 )
                 if (!error.isNullOrBlank()) {
                     Spacer(Modifier.height(12.dp))
@@ -315,7 +317,8 @@ private fun GuestVideoSurface(
         ShareDabbaBannerAd(
             modifier = Modifier.fillMaxWidth(),
             slotKey = "player-top",
-            enabled = bannerAdsEnabled
+            enabled = bannerAdsEnabled,
+            adUnitId = bannerUnitId
         )
         AndroidView(
             factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
@@ -324,7 +327,8 @@ private fun GuestVideoSurface(
         ShareDabbaBannerAd(
             modifier = Modifier.fillMaxWidth(),
             slotKey = "player-bottom",
-            enabled = bannerAdsEnabled
+            enabled = bannerAdsEnabled,
+            adUnitId = bannerUnitId
         )
     }
 }
