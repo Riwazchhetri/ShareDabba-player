@@ -10,6 +10,8 @@ import com.google.android.libraries.ads.mobile.sdk.rewarded.OnUserEarnedRewardLi
 import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardItem
 import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdPreloader
+import com.google.android.libraries.ads.mobile.sdk.rewardedinterstitial.RewardedInterstitialAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.rewardedinterstitial.RewardedInterstitialAdPreloader
 
 /**
  * Full-screen GMA Next-Gen ad lifecycle.
@@ -23,6 +25,7 @@ import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdPreloader
 object AdMobFullscreenAds {
     private var configuredInterstitialId: String? = null
     private var configuredRewardedId: String? = null
+    private var configuredRewardedInterstitialId: String? = null
     private var lastFullscreenImpressionAtMs = 0L
     private var interstitialImpressionsThisSession = 0
     private var videosStartedSinceLastInterstitial = 0
@@ -39,7 +42,7 @@ object AdMobFullscreenAds {
         videosBetweenInterstitials = everyNVideos.coerceIn(1, 50)
     }
 
-    fun startPreloading(interstitialUnitId: String?, rewardedUnitId: String?) {
+    fun startPreloading(interstitialUnitId: String?, rewardedUnitId: String?, rewardedInterstitialUnitId: String? = null) {
         if (!AdMobRuntime.isInitialized.value) return
 
         val nextInterstitialId = interstitialUnitId?.takeIf { it.isNotBlank() }
@@ -54,9 +57,19 @@ object AdMobFullscreenAds {
         val nextRewardedId = rewardedUnitId?.takeIf { it.isNotBlank() }
         if (configuredRewardedId != nextRewardedId) {
             configuredRewardedId?.let { RewardedAdPreloader.destroy(it) }
+        configuredRewardedInterstitialId?.let { RewardedInterstitialAdPreloader.destroy(it) }
             configuredRewardedId = nextRewardedId
             nextRewardedId?.let { id ->
                 RewardedAdPreloader.start(id, PreloadConfiguration(AdRequest.Builder(id).build()))
+            }
+        }
+
+        val nextRewardedInterstitialId = rewardedInterstitialUnitId?.takeIf { it.isNotBlank() }
+        if (configuredRewardedInterstitialId != nextRewardedInterstitialId) {
+            configuredRewardedInterstitialId?.let { RewardedInterstitialAdPreloader.destroy(it) }
+            configuredRewardedInterstitialId = nextRewardedInterstitialId
+            nextRewardedInterstitialId?.let { id ->
+                RewardedInterstitialAdPreloader.start(id, PreloadConfiguration(AdRequest.Builder(id).build()))
             }
         }
     }
@@ -165,10 +178,57 @@ object AdMobFullscreenAds {
         }
     }
 
+
+    /**
+     * Rewarded-interstitial presentation is called only after an intro screen tells the
+     * viewer what they earn and offers a clear opt-out.
+     */
+    fun showRewardedInterstitialAfterIntro(
+        activity: Activity,
+        onRewardEarned: (amount: Int, type: String) -> Unit,
+        onFinished: () -> Unit = {}
+    ): Boolean {
+        val id = configuredRewardedInterstitialId ?: return false
+        if (isRewardedShowing) return false
+        val ad = RewardedInterstitialAdPreloader.pollAd(id) ?: return false
+        isRewardedShowing = true
+        var finished = false
+        fun finishOnce() {
+            if (!finished) {
+                finished = true
+                isRewardedShowing = false
+                onFinished()
+            }
+        }
+        ad.adEventCallback = object : RewardedInterstitialAdEventCallback {
+            override fun onAdShowedFullScreenContent() = Unit
+            override fun onAdDismissedFullScreenContent() { activity.runOnUiThread { finishOnce() } }
+            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) { activity.runOnUiThread { finishOnce() } }
+            override fun onAdImpression() {
+                lastFullscreenImpressionAtMs = System.currentTimeMillis()
+            }
+            override fun onAdClicked() = Unit
+        }
+        return try {
+            ad.show(activity, object : OnUserEarnedRewardListener {
+                override fun onUserEarnedReward(rewardItem: RewardItem) {
+                    activity.runOnUiThread {
+                        onRewardEarned(rewardItem.amount, rewardItem.type)
+                    }
+                }
+            })
+            true
+        } catch (_: Exception) {
+            finishOnce()
+            false
+        }
+    }
+
     fun stopPreloading() {
         configuredInterstitialId?.let { InterstitialAdPreloader.destroy(it) }
         configuredRewardedId?.let { RewardedAdPreloader.destroy(it) }
         configuredInterstitialId = null
         configuredRewardedId = null
+        configuredRewardedInterstitialId = null
     }
 }
