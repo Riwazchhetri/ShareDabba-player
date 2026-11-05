@@ -2,7 +2,11 @@ package com.example.remoteconfig
 
 import com.example.core.config.EnvironmentConfig
 import com.example.core.logging.AppLogger
-import com.example.network.IntegrationContractRegistry
+import com.example.network.NetworkClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,13 +63,15 @@ data class AdminVideoPlayerConfig(
  * Group D — ADVERTISING (Website Admin Panel Controlled)
  */
 data class AdminAdvertisingConfig(
-    val approvedAdProvider: String = "NONE", // "NONE", "WEBSITE_VAST"
+    val approvedAdProvider: String = "NONE", // "NONE", "GOOGLE_ADMOB_APPROVED", "WEBSITE_VAST"
     val bannerAdUnitId: String = "",
     val interstitialAdUnitId: String = "",
     val rewardedAdUnitId: String = "",
+    val rewardedInterstitialAdUnitId: String = "",
     val enableBannerPlacements: Boolean = false,
     val enableInterstitialPlacements: Boolean = false,
     val enableRewardedPlacements: Boolean = false,
+    val enableRewardedInterstitialPlacements: Boolean = false,
     val adFrequencyEveryNVideos: Int = 5,
     val adCooldownSeconds: Int = 180,
     val maxAdsPerSession: Int = 4,
@@ -139,7 +145,7 @@ object RemoteConfigValidator {
     )
 
     private val SUPPORTED_QUALITY_IDS = setOf("auto", "1080p", "720p", "480p", "360p")
-    private val BUNDLED_AD_PROVIDERS = setOf("NONE", "WEBSITE_VAST")
+    private val BUNDLED_AD_PROVIDERS = setOf("NONE", "WEBSITE_VAST", "GOOGLE_ADMOB_APPROVED")
     private val HEX_COLOR_REGEX = Regex("^#[0-9A-Fa-f]{6,8}$")
 
     fun containsExecutableCodeOrScript(input: String?): Boolean {
@@ -170,6 +176,16 @@ object RemoteConfigValidator {
             if (!trimmed.startsWith("https://")) {
                 sanitizedFields.add("Replaced non-HTTPS URL in '$fieldName' with safe default")
                 return fallback
+            }
+            return trimmed
+        }
+
+        fun cleanAdUnitId(fieldName: String, value: String): String {
+            val trimmed = value.trim()
+            if (trimmed.isEmpty()) return ""
+            if (!Regex("^ca-app-pub-[0-9]{16}/[0-9]{10}$").matches(trimmed)) {
+                sanitizedFields.add("Invalid AdMob unit ID in '$fieldName'; placement disabled")
+                return ""
             }
             return trimmed
         }
@@ -254,8 +270,20 @@ object RemoteConfigValidator {
         if (clampedCooldown != rawAds.adCooldownSeconds || clampedMaxAds != rawAds.maxAdsPerSession) {
             sanitizedFields.add("Clamped advertising cooldown/maxAdsPerSession to safe bounds")
         }
+        val cleanBannerId = cleanAdUnitId("advertising.bannerAdUnitId", rawAds.bannerAdUnitId)
+        val cleanInterstitialId = cleanAdUnitId("advertising.interstitialAdUnitId", rawAds.interstitialAdUnitId)
+        val cleanRewardedId = cleanAdUnitId("advertising.rewardedAdUnitId", rawAds.rewardedAdUnitId)
+        val cleanRewardedInterstitialId = cleanAdUnitId("advertising.rewardedInterstitialAdUnitId", rawAds.rewardedInterstitialAdUnitId)
         val cleanAds = rawAds.copy(
             approvedAdProvider = cleanProvider,
+            bannerAdUnitId = cleanBannerId,
+            interstitialAdUnitId = cleanInterstitialId,
+            rewardedAdUnitId = cleanRewardedId,
+            rewardedInterstitialAdUnitId = cleanRewardedInterstitialId,
+            enableBannerPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableBannerPlacements && cleanBannerId.isNotEmpty(),
+            enableInterstitialPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableInterstitialPlacements && cleanInterstitialId.isNotEmpty(),
+            enableRewardedPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableRewardedPlacements && cleanRewardedId.isNotEmpty(),
+            enableRewardedInterstitialPlacements = cleanProvider == "GOOGLE_ADMOB_APPROVED" && rawAds.enableRewardedInterstitialPlacements && cleanRewardedInterstitialId.isNotEmpty(),
             adFrequencyEveryNVideos = clampedFreq,
             adCooldownSeconds = clampedCooldown,
             maxAdsPerSession = clampedMaxAds
@@ -324,6 +352,8 @@ class RemoteConfigManager(
         const val MIN_REFRESH_INTERVAL_MS: Long = 15 * 60 * 1000L // 15 minutes
     }
 
+    private val apiService by lazy { NetworkClient.createApiService(environmentConfig) }
+    private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _activeConfig = MutableStateFlow(PublishedRemoteConfig.SAFE_DEFAULT)
     val activeConfig: StateFlow<PublishedRemoteConfig> = _activeConfig.asStateFlow()
 
@@ -336,7 +366,7 @@ class RemoteConfigManager(
     val lastValidationReport: StateFlow<RemoteConfigValidationReport> = _lastValidationReport.asStateFlow()
 
     private val _statusBanner = MutableStateFlow(
-        "Initialized with Safe Defaults (v1). Website Admin Panel endpoint: ${environmentConfig.apiBaseUrl}config"
+        "Initialized with Safe Defaults (v1). Website Admin Panel endpoint: ${environmentConfig.apiBaseUrl}api/v1/config/android"
     )
     val statusBanner: StateFlow<String> = _statusBanner.asStateFlow()
 
@@ -375,14 +405,49 @@ class RemoteConfigManager(
         networkFetchCount++
         lastFetchTimestampMs = currentTimeMs
 
-        return if (IntegrationContractRegistry.IS_BACKEND_CONNECTION_COMPLETE) {
-            _statusBanner.value = "Fetched live Website Admin Panel configuration (v${_activeConfig.value.configVersion})."
-            _activeConfig.value
-        } else {
-            _statusBanner.value =
-                "Website Admin Panel API (${environmentConfig.apiBaseUrl}config) awaiting repo connection; serving validated cached v${_activeConfig.value.configVersion}."
-            _activeConfig.value
+        _statusBanner.value = "Fetching live Website Admin Panel advertising settings."
+        refreshScope.launch {
+            try {
+                val response = apiService.getAndroidRemoteConfig()
+                val ads = response.advertising
+                val current = _activeConfig.value
+                val candidate = current.copy(
+                    configVersion = current.configVersion + 1,
+                    publishedAtIso = response.serverTimestamp ?: current.publishedAtIso,
+                    sourceLabel = "WEBSITE_ADMIN_PANEL_API",
+                    advertising = AdminAdvertisingConfig(
+                        approvedAdProvider = ads.approvedAdProvider,
+                        bannerAdUnitId = ads.bannerAdUnitId,
+                        interstitialAdUnitId = ads.interstitialAdUnitId,
+                        rewardedInterstitialAdUnitId = ads.rewardedInterstitialAdUnitId,
+                        rewardedAdUnitId = ads.rewardedAdUnitId,
+                        enableBannerPlacements = ads.enableBannerPlacements,
+                        enableInterstitialPlacements = ads.enableInterstitialPlacements,
+                        enableRewardedPlacements = ads.enableRewardedPlacements,
+                        enableRewardedInterstitialPlacements = ads.enableRewardedInterstitialPlacements,
+                        adFrequencyEveryNVideos = ads.adFrequencyEveryNVideos,
+                        adCooldownSeconds = ads.adCooldownSeconds,
+                        maxAdsPerSession = ads.maxAdsPerSession,
+                        adTestModeEnabled = ads.adTestModeEnabled,
+                        adFallbackStrategy = ads.adFallbackStrategy
+                    ),
+                    appManagement = current.appManagement.copy(
+                        maintenanceModeEnabled = response.platform.maintenanceMode,
+                        maintenanceMessage = response.platform.maintenanceMessage.ifBlank {
+                            current.appManagement.maintenanceMessage
+                        }
+                    )
+                )
+                val report = applyAdminPanelConfigUpdate(candidate)
+                _statusBanner.value = "Synced live Website Admin Panel config v" +
+                    report.sanitizedConfig.configVersion + "."
+            } catch (error: Exception) {
+                _statusBanner.value = "Admin Panel sync failed; keeping last safe config. " +
+                    (error.message ?: "")
+                AppLogger.e(TAG, "Failed to fetch Android Admin Panel config", error)
+            }
         }
+        return _activeConfig.value
     }
 
     /**

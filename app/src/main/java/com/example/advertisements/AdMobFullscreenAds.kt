@@ -1,0 +1,234 @@
+package com.example.advertisements
+
+import android.app.Activity
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.PreloadConfiguration
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAdPreloader
+import com.google.android.libraries.ads.mobile.sdk.rewarded.OnUserEarnedRewardListener
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardItem
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdPreloader
+import com.google.android.libraries.ads.mobile.sdk.rewardedinterstitial.RewardedInterstitialAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.rewardedinterstitial.RewardedInterstitialAdPreloader
+
+/**
+ * Full-screen GMA Next-Gen ad lifecycle.
+ *
+ * Ads are preloaded only after UMP has allowed requests and the website Admin Panel
+ * explicitly enables the Google AdMob provider and the relevant placement.
+ * Interstitials are only shown at a user-initiated navigation transition, never
+ * over active video playback. Reward callbacks are exposed to the caller; this
+ * class does not invent wallet credits or grant client-authoritative money.
+ */
+object AdMobFullscreenAds {
+    private var configuredInterstitialId: String? = null
+    private var configuredRewardedId: String? = null
+    private var configuredRewardedInterstitialId: String? = null
+    private var lastFullscreenImpressionAtMs = 0L
+    private var interstitialImpressionsThisSession = 0
+    private var videosStartedSinceLastInterstitial = 0
+    private var isInterstitialShowing = false
+    private var isRewardedShowing = false
+
+    private var minFullscreenGapMs = 180_000L
+    private var maxFullscreenImpressionsPerSession = 4
+    private var videosBetweenInterstitials = 5
+
+    fun configurePacing(cooldownSeconds: Int, maxAdsPerSession: Int, everyNVideos: Int) {
+        minFullscreenGapMs = cooldownSeconds.coerceIn(0, 3600) * 1000L
+        maxFullscreenImpressionsPerSession = maxAdsPerSession.coerceIn(0, 20)
+        videosBetweenInterstitials = everyNVideos.coerceIn(1, 50)
+    }
+
+    fun startPreloading(interstitialUnitId: String?, rewardedUnitId: String?, rewardedInterstitialUnitId: String? = null) {
+        if (!AdMobRuntime.isInitialized.value) return
+
+        val nextInterstitialId = interstitialUnitId?.takeIf { it.isNotBlank() }
+        if (configuredInterstitialId != nextInterstitialId) {
+            configuredInterstitialId?.let { InterstitialAdPreloader.destroy(it) }
+            configuredInterstitialId = nextInterstitialId
+            nextInterstitialId?.let { id ->
+                InterstitialAdPreloader.start(id, PreloadConfiguration(AdRequest.Builder(id).build()))
+            }
+        }
+
+        val nextRewardedId = rewardedUnitId?.takeIf { it.isNotBlank() }
+        if (configuredRewardedId != nextRewardedId) {
+            configuredRewardedId?.let { RewardedAdPreloader.destroy(it) }
+            configuredRewardedId = nextRewardedId
+            nextRewardedId?.let { id ->
+                RewardedAdPreloader.start(id, PreloadConfiguration(AdRequest.Builder(id).build()))
+            }
+        }
+
+        val nextRewardedInterstitialId = rewardedInterstitialUnitId?.takeIf { it.isNotBlank() }
+        if (configuredRewardedInterstitialId != nextRewardedInterstitialId) {
+            configuredRewardedInterstitialId?.let { RewardedInterstitialAdPreloader.destroy(it) }
+            configuredRewardedInterstitialId = nextRewardedInterstitialId
+            nextRewardedInterstitialId?.let { id ->
+                RewardedInterstitialAdPreloader.start(id, PreloadConfiguration(AdRequest.Builder(id).build()))
+            }
+        }
+    }
+
+    fun onVideoStarted() {
+        videosStartedSinceLastInterstitial += 1
+    }
+
+    /**
+     * Returns false and immediately invokes onFinished when no eligible ad is ready.
+     * Call only for an explicit transition such as the viewer tapping Back.
+     */
+    fun showInterstitialAtTransition(activity: Activity, onFinished: () -> Unit): Boolean {
+        val id = configuredInterstitialId
+        val now = System.currentTimeMillis()
+        val eligible = id != null &&
+            !isInterstitialShowing &&
+            interstitialImpressionsThisSession < maxFullscreenImpressionsPerSession &&
+            videosStartedSinceLastInterstitial >= videosBetweenInterstitials &&
+            (lastFullscreenImpressionAtMs == 0L || now - lastFullscreenImpressionAtMs >= minFullscreenGapMs)
+
+        if (!eligible) {
+            onFinished()
+            return false
+        }
+
+        val ad = InterstitialAdPreloader.pollAd(id!!)
+        if (ad == null) {
+            onFinished()
+            return false
+        }
+
+        isInterstitialShowing = true
+        var finished = false
+        fun finishOnce() {
+            if (!finished) {
+                finished = true
+                isInterstitialShowing = false
+                onFinished()
+            }
+        }
+
+        ad.adEventCallback = object : InterstitialAdEventCallback {
+            override fun onAdShowedFullScreenContent() = Unit
+            override fun onAdDismissedFullScreenContent() { activity.runOnUiThread { finishOnce() } }
+            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) { activity.runOnUiThread { finishOnce() } }
+            override fun onAdImpression() {
+                lastFullscreenImpressionAtMs = System.currentTimeMillis()
+                interstitialImpressionsThisSession += 1
+                videosStartedSinceLastInterstitial = 0
+            }
+            override fun onAdClicked() = Unit
+        }
+        try {
+            ad.show(activity)
+            return true
+        } catch (_: Exception) {
+            finishOnce()
+            return false
+        }
+    }
+
+    /**
+     * Shows a rewarded ad only after an explicit user action. onRewardEarned is called
+     * exclusively from Google's earned-reward callback. The caller must connect this
+     * to a server-verified entitlement before adding wallet value or creator earnings.
+     */
+    fun showRewardedAfterOptIn(
+        activity: Activity,
+        onRewardEarned: (amount: Int, type: String) -> Unit,
+        onFinished: () -> Unit = {}
+    ): Boolean {
+        val id = configuredRewardedId ?: return false
+        if (isRewardedShowing) return false
+        val ad = RewardedAdPreloader.pollAd(id) ?: return false
+        isRewardedShowing = true
+        var finished = false
+        fun finishOnce() {
+            if (!finished) {
+                finished = true
+                isRewardedShowing = false
+                onFinished()
+            }
+        }
+        ad.adEventCallback = object : RewardedAdEventCallback {
+            override fun onAdShowedFullScreenContent() = Unit
+            override fun onAdDismissedFullScreenContent() { activity.runOnUiThread { finishOnce() } }
+            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) { activity.runOnUiThread { finishOnce() } }
+            override fun onAdImpression() {
+                lastFullscreenImpressionAtMs = System.currentTimeMillis()
+            }
+            override fun onAdClicked() = Unit
+        }
+        return try {
+            ad.show(activity, object : OnUserEarnedRewardListener {
+                override fun onUserEarnedReward(rewardItem: RewardItem) {
+                    activity.runOnUiThread {
+                        onRewardEarned(rewardItem.amount, rewardItem.type)
+                    }
+                }
+            })
+            true
+        } catch (_: Exception) {
+            finishOnce()
+            false
+        }
+    }
+
+
+    /**
+     * Rewarded-interstitial presentation is called only after an intro screen tells the
+     * viewer what they earn and offers a clear opt-out.
+     */
+    fun showRewardedInterstitialAfterIntro(
+        activity: Activity,
+        onRewardEarned: (amount: Int, type: String) -> Unit,
+        onFinished: () -> Unit = {}
+    ): Boolean {
+        val id = configuredRewardedInterstitialId ?: return false
+        if (isRewardedShowing) return false
+        val ad = RewardedInterstitialAdPreloader.pollAd(id) ?: return false
+        isRewardedShowing = true
+        var finished = false
+        fun finishOnce() {
+            if (!finished) {
+                finished = true
+                isRewardedShowing = false
+                onFinished()
+            }
+        }
+        ad.adEventCallback = object : RewardedInterstitialAdEventCallback {
+            override fun onAdShowedFullScreenContent() = Unit
+            override fun onAdDismissedFullScreenContent() { activity.runOnUiThread { finishOnce() } }
+            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) { activity.runOnUiThread { finishOnce() } }
+            override fun onAdImpression() {
+                lastFullscreenImpressionAtMs = System.currentTimeMillis()
+            }
+            override fun onAdClicked() = Unit
+        }
+        return try {
+            ad.show(activity, object : OnUserEarnedRewardListener {
+                override fun onUserEarnedReward(rewardItem: RewardItem) {
+                    activity.runOnUiThread {
+                        onRewardEarned(rewardItem.amount, rewardItem.type)
+                    }
+                }
+            })
+            true
+        } catch (_: Exception) {
+            finishOnce()
+            false
+        }
+    }
+
+    fun stopPreloading() {
+        configuredInterstitialId?.let { InterstitialAdPreloader.destroy(it) }
+        configuredRewardedId?.let { RewardedAdPreloader.destroy(it) }
+        configuredRewardedInterstitialId?.let { RewardedInterstitialAdPreloader.destroy(it) }
+        configuredInterstitialId = null
+        configuredRewardedId = null
+        configuredRewardedInterstitialId = null
+    }
+}
