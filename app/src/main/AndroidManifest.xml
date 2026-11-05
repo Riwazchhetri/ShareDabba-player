@@ -16,6 +16,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">
+
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-4643856509495992~3638853837" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
@@ -26,69 +31,29 @@
             android:theme="@style/Theme.MyApplication">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!--
-                STAGE 7: Android App Links Intent Filter (HTTPS).
-                Supports canonical candidate routes (/v/*, /watch/*, /video/*) on sharedabba.com.
-                Note: Verified Android App Links require hosting /.well-known/assetlinks.json
-                on the live domain with the production signing certificate SHA-256 fingerprint.
-            -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
-
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:scheme="https"
-                    android:host="sharedabba.com"
-                    android:pathPrefix="/v/" />
-                <data
-                    android:scheme="https"
-                    android:host="sharedabba.com"
-                    android:pathPrefix="/watch" />
-                <data
-                    android:scheme="https"
-                    android:host="sharedabba.com"
-                    android:pathPrefix="/video/" />
-                <data
-                    android:scheme="https"
-                    android:host="www.sharedabba.com"
-                    android:pathPrefix="/v/" />
-                <data
-                    android:scheme="https"
-                    android:host="www.sharedabba.com"
-                    android:pathPrefix="/watch" />
-                <data
-                    android:scheme="https"
-                    android:host="www.sharedabba.com"
-                    android:pathPrefix="/video/" />
+                <data android:scheme="https" android:host="sharedabba.com" android:pathPrefix="/v/" />
+                <data android:scheme="https" android:host="sharedabba.com" android:pathPrefix="/watch" />
+                <data android:scheme="https" android:host="sharedabba.com" android:pathPrefix="/video/" />
+                <data android:scheme="https" android:host="www.sharedabba.com" android:pathPrefix="/v/" />
+                <data android:scheme="https" android:host="www.sharedabba.com" android:pathPrefix="/watch" />
+                <data android:scheme="https" android:host="www.sharedabba.com" android:pathPrefix="/video/" />
             </intent-filter>
 
-            <!--
-                STAGE 7: Custom Scheme Deep Link Filter (sharedabba://)
-                Used by the web landing page "Open in ShareDabba" action.
-            -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:scheme="sharedabba"
-                    android:host="v" />
-                <data
-                    android:scheme="sharedabba"
-                    android:host="watch" />
-                <data
-                    android:scheme="sharedabba"
-                    android:host="stream" />
+                <data android:scheme="sharedabba" android:host="v" />
+                <data android:scheme="sharedabba" android:host="watch" />
+                <data android:scheme="sharedabba" android:host="stream" />
             </intent-filter>
         </activity>
     </application>
-
 </manifest>
