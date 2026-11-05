@@ -2,7 +2,7 @@ package com.example.remoteconfig
 
 import com.example.core.config.EnvironmentConfig
 import com.example.core.logging.AppLogger
-import com.example.network.IntegrationContractRegistry
+import com.example.network.ShareDabbaApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -317,7 +317,8 @@ object RemoteConfigValidator {
  * - Configuration versioning & instant rollback (`rollbackToPreviousValidConfig`)
  */
 class RemoteConfigManager(
-    private val environmentConfig: EnvironmentConfig
+    private val environmentConfig: EnvironmentConfig,
+    private val apiService: ShareDabbaApiService
 ) {
     companion object {
         private const val TAG = "RemoteConfigManager"
@@ -352,7 +353,7 @@ class RemoteConfigManager(
     /**
      * Triggered automatically on app launch (`ShareDabbaApplication.onCreate`).
      */
-    fun fetchOnAppLaunch(currentTimeMs: Long = System.currentTimeMillis()): PublishedRemoteConfig {
+    suspend fun fetchOnAppLaunch(currentTimeMs: Long = System.currentTimeMillis()): PublishedRemoteConfig {
         return refreshFromWebsiteAdminPanel(forceRefresh = false, currentTimeMs = currentTimeMs)
     }
 
@@ -360,7 +361,7 @@ class RemoteConfigManager(
      * Fetches or refreshes the published remote configuration from the ShareDabba website backend,
      * respecting the refresh cooldown interval unless `forceRefresh = true`.
      */
-    fun refreshFromWebsiteAdminPanel(
+    suspend fun refreshFromWebsiteAdminPanel(
         forceRefresh: Boolean = false,
         currentTimeMs: Long = System.currentTimeMillis()
     ): PublishedRemoteConfig {
@@ -373,14 +374,22 @@ class RemoteConfigManager(
         }
 
         networkFetchCount++
-        lastFetchTimestampMs = currentTimeMs
-
-        return if (IntegrationContractRegistry.IS_BACKEND_CONNECTION_COMPLETE) {
-            _statusBanner.value = "Fetched live Website Admin Panel configuration (v${_activeConfig.value.configVersion})."
+        return try {
+            val candidate = apiService.getAndroidRemoteConfig()
+            val report = applyAdminPanelConfigUpdate(candidate)
+            lastFetchTimestampMs = currentTimeMs
+            if (report.isValid) {
+                _statusBanner.value =
+                    "Connected to ShareDabba Admin Panel. Loaded remote config v${report.sanitizedConfig.configVersion}."
+            } else {
+                _statusBanner.value =
+                    "Remote config received; unsafe fields were rejected. Using sanitized config v${report.sanitizedConfig.configVersion}."
+            }
             _activeConfig.value
-        } else {
+        } catch (error: Exception) {
             _statusBanner.value =
-                "Website Admin Panel API (${environmentConfig.apiBaseUrl}config) awaiting repo connection; serving validated cached v${_activeConfig.value.configVersion}."
+                "Remote config unavailable. Continuing with last valid config v${_activeConfig.value.configVersion}."
+            AppLogger.w(TAG, "Remote config fetch failed; safe cached configuration remains active.", error)
             _activeConfig.value
         }
     }
