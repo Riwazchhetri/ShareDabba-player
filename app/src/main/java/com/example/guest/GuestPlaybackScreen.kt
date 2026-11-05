@@ -36,6 +36,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.core.config.EnvironmentConfig
+import com.example.advertisements.ShareDabbaBannerAd
 import com.example.network.NetworkClient
 import kotlinx.coroutines.launch
 import java.net.URI
@@ -68,6 +69,11 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                ShareDabbaBannerAd(
+                    modifier = Modifier.fillMaxWidth(),
+                    slotKey = "home-top"
+                )
+                Spacer(Modifier.height(12.dp))
                 Text("ShareDabba Player", color = Color.White, fontSize = 27.sp)
                 Spacer(Modifier.height(8.dp))
                 Text("Paste a ShareDabba video link to play", color = Color(0xFFB8B8C5), fontSize = 14.sp)
@@ -113,6 +119,15 @@ fun GuestPlaybackScreen(initialLink: String? = null) {
                 ) {
                     if (loading) CircularProgressIndicator() else Text("Play Video")
                 }
+                ShareDabbaBannerAd(
+                    modifier = Modifier.fillMaxWidth(),
+                    slotKey = "home-below-play"
+                )
+                Spacer(Modifier.height(8.dp))
+                ShareDabbaBannerAd(
+                    modifier = Modifier.fillMaxWidth(),
+                    slotKey = "home-bottom"
+                )
                 if (!error.isNullOrBlank()) {
                     Spacer(Modifier.height(12.dp))
                     Text(error!!, color = Color(0xFFFF8A8A), fontSize = 14.sp)
@@ -184,9 +199,17 @@ private fun GuestVideoSurface(url: String, title: String, onBack: () -> Unit) {
             modifier = Modifier.padding(16.dp).clickable(onClick = onBack)
         )
         Text(title, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        ShareDabbaBannerAd(
+            modifier = Modifier.fillMaxWidth(),
+            slotKey = "player-top"
+        )
         AndroidView(
             factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } },
             modifier = Modifier.fillMaxWidth().weight(1f)
+        )
+        ShareDabbaBannerAd(
+            modifier = Modifier.fillMaxWidth(),
+            slotKey = "player-bottom"
         )
     }
 }
